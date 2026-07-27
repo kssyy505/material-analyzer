@@ -80,13 +80,28 @@ section[data-testid="stSidebar"] {
 /* 소제목 색 */
 h3 { color: #123c78; }
 
-/* 제목 배너를 스크롤을 내려도 상단에 고정 (Streamlit 요소 컨테이너를 sticky로) */
+/* 제목 배너를 스크롤을 내려도 상단에 고정 (Streamlit 요소 컨테이너를 sticky로).
+   Streamlit 기본 상단 바(약 3.75rem)에 가려 잘리지 않도록 그 아래에 고정. */
 div[data-testid="stElementContainer"]:has(#hero-sticky) {
     position: sticky;
-    top: 0;
+    top: 3.75rem;
     z-index: 999;
     background: #f5f8fc;
-    padding-top: 4px;
+    padding: 6px 0 8px;
+}
+/* Streamlit 상단 바를 불투명하게 해서 고정 배너와 겹칠 때 깔끔하게 */
+header[data-testid="stHeader"] { background: #f5f8fc; }
+
+/* 주기율표 셀: 마우스를 올리면 눌리는 듯한(버튼 같은) 효과 */
+.ptcell {
+    transition: transform .08s ease, box-shadow .08s ease, filter .08s ease;
+    cursor: pointer;
+}
+.ptcell:hover {
+    transform: translateY(-2px) scale(1.10);
+    box-shadow: 0 3px 9px rgba(10,31,68,.35);
+    filter: brightness(1.08);
+    position: relative; z-index: 3;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -890,7 +905,8 @@ if st.session_state.view == "overview":
                 _dark = _v > 0 and (np.log10(_v + 1) / (_maxlog or 1)) >= 0.6
                 _fg = "#ffffff" if _dark else ("#1a2b45" if _v > 0 else "#c4ccd8")
                 _cells += (
-                    f'<div title="{_e}: {_v:,}회" style="grid-row:{_r}; '
+                    f'<div class="ptcell" title="{_e}: {_v:,}개 물질" '
+                    f'style="grid-row:{_r}; '
                     f'grid-column:{_cc}; background:{_bg}; border-radius:4px; '
                     f'display:flex; align-items:center; justify-content:center; '
                     f'aspect-ratio:1; font-size:11px; font-weight:600; '
@@ -903,19 +919,61 @@ if st.session_state.view == "overview":
                 _top5 = ", ".join(f"{k}({v:,})" for k, v in
                                   _elc.sort_values(ascending=False).head(5).items())
                 st.caption(f"최다 등장 원소: {_top5}")
-                # 원소를 선택하면 등장 물질 수를 표시 (셀에 마우스를 올려도 표시)
-                _el_opts = sorted(_PT.keys())
+                # 원소 선택 → 요약 카드 (개수·평균 물성·상위 물질)
+                _el_opts = sorted(_elc.index.tolist()) or sorted(_PT.keys())
                 _el_sel = st.selectbox(
-                    "원소 선택 → 등장 물질 수 확인", _el_opts,
+                    "원소 선택 → 요약 보기", _el_opts,
                     index=_el_opts.index("O") if "O" in _el_opts else 0,
                     key="ov_el_pick")
-                _el_cnt = int(_elc.get(_el_sel, 0))
+                if "_elements" in df.columns:
+                    _emask = df["_elements"].map(lambda s: _el_sel in s
+                                                 if isinstance(s, (set, frozenset))
+                                                 else False)
+                else:
+                    _emask = df[FORMULA_COL].astype(str).str.contains(
+                        _el_sel, na=False) if FORMULA_COL else pd.Series(
+                        False, index=df.index)
+                _edf = df[_emask]
+                _ecnt = len(_edf)
+
+                def _favg(col):
+                    if col in _edf.columns and _edf[col].notna().any():
+                        return f"{_edf[col].mean():.2f}"
+                    return "—"
+                _agap, _an, _ap = (_favg("electronic_band_gap"),
+                                   _favg("S_mu_n"), _favg("S_mu_p"))
                 st.markdown(
                     f'<div style="background:#eef4fc; border:1px solid #cfe0f5; '
-                    f'border-radius:8px; padding:8px 12px; font-size:13px; '
-                    f'color:#0a1f44;"><b>{_el_sel}</b> 원소는 '
-                    f'<b>{_el_cnt:,}개</b> 물질에 등장합니다.</div>',
+                    f'border-radius:8px; padding:10px 12px;">'
+                    f'<div style="font-size:14px; font-weight:700; '
+                    f'color:#0a1f44; margin-bottom:6px;">{_el_sel} 포함 물질 요약</div>'
+                    f'<div style="display:flex; gap:8px; flex-wrap:wrap; '
+                    f'font-size:12px; color:#1a2b45;">'
+                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                    f'border-radius:6px; padding:4px 8px;">물질 수 '
+                    f'<b>{_ecnt:,}</b></span>'
+                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                    f'border-radius:6px; padding:4px 8px;">평균 밴드갭 '
+                    f'<b>{_agap}</b> eV</span>'
+                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                    f'border-radius:6px; padding:4px 8px;">평균 S_mu_n '
+                    f'<b>{_an}</b></span>'
+                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                    f'border-radius:6px; padding:4px 8px;">평균 S_mu_p '
+                    f'<b>{_ap}</b></span></div></div>',
                     unsafe_allow_html=True)
+                # mobility 상위 물질 Top 5
+                if _ecnt and {"S_mu_n", "S_mu_p"} <= set(_edf.columns):
+                    _mm = _edf[["S_mu_n", "S_mu_p"]].max(axis=1)
+                    _topd = _edf.assign(_m=_mm).dropna(subset=["_m"]).nlargest(5, "_m")
+                    if not _topd.empty:
+                        _cols = [c for c in ["material_id", "source", FORMULA_COL,
+                                             "electronic_band_gap",
+                                             "S_mu_n", "S_mu_p"]
+                                 if c and c in _topd.columns]
+                        st.caption(f"{_el_sel} 포함 · mobility 상위 물질")
+                        st.dataframe(_topd[_cols].reset_index(drop=True),
+                                     use_container_width=True, height=150)
 
     st.markdown("---")
 
