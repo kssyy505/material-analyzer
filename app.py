@@ -482,7 +482,17 @@ def _add_derived_row(vals: dict) -> dict:
     return out
 
 
-R2_SOURCE = "앱 라이브 계산 · 노트북 방법론 재현 · 5-fold CV"
+R2_SOURCE = "앱 라이브 계산 · dDOS0.1 모델 재현 · 5-fold CV"
+
+# 반대 캐리어(교차 채널) feature 제외 — 노트북 dDOS0.1 방법론.
+# n형 예측엔 정공계(m_p*, vbm, EF_minus_VBM, log_m_p)가, p형 예측엔
+# 전자계(m_n*, cbm, CBM_minus_EF, log_m_n)가 물리적으로 무관하므로 제외한다.
+_CROSS_EXCLUDE = {
+    "S_mu_n": {"m_p_epsilon1", "m_p_epsilon2", "m_p_epsilon3", "m_p_epsilon|avg",
+               "log_m_p", "EF_minus_VBM", "vbm"},
+    "S_mu_p": {"m_n_epsilon1", "m_n_epsilon2", "m_n_epsilon3", "m_n_epsilon|avg",
+               "log_m_n", "CBM_minus_EF", "cbm"},
+}
 
 # 노트북과 동일한 전용 학습 데이터(있으면 우선 사용). feature 파일은
 # merged_materials_Fermi_carriers_300K, 정답은 mobility_score_*.
@@ -551,8 +561,9 @@ def get_mobility_models():
                           suffixes=("", "_y")).dropna(subset=[target])
         if merged.empty:
             continue
+        _excl = _NON_FEATURE | _CROSS_EXCLUDE.get(target, set())
         feat_cols = [c for c in merged.columns
-                     if c not in _NON_FEATURE and not c.endswith("_y")
+                     if c not in _excl and not c.endswith("_y")
                      and pd.api.types.is_numeric_dtype(merged[c])]
         v = merged[target].abs()                     # |μ| (노트북과 동일)
         if wins:
@@ -624,18 +635,20 @@ def get_mobility_importance(channel, top=8):
 
 
 def predict_mobility_row(base_vals):
-    """물성 dict → (mu_n, pn, mu_p, pp). 모델 없으면 None."""
+    """물성 dict → (mu_n, pn, mu_p, pp). 모델 없으면 None.
+    n형·p형 모델은 CROSS_EXCLUDE로 feature 집합이 다르므로 각자 자기 feature로."""
     bundles = get_mobility_models()
     bn, bp = bundles.get("n-type"), bundles.get("p-type")
     if not bn or not bp:
         return None
-    feat = bn["meta"]["feat_cols"]
-    med = bn["meta"]["medians"]
     full = _add_derived_row(dict(base_vals))
-    X = pd.DataFrame([[full.get(c, med.get(c)) for c in feat]], columns=feat)
 
     def _pr(b):
-        mu = float(np.expm1(b["model"].predict(X)[0]))
+        _feat = b["meta"]["feat_cols"]
+        _med = b["meta"]["medians"]
+        _X = pd.DataFrame([[full.get(c, _med.get(c)) for c in _feat]],
+                          columns=_feat)
+        mu = float(np.expm1(b["model"].predict(_X)[0]))
         g = np.asarray(b["meta"]["pct_grid"])
         return max(mu, 0.0), int(np.clip(np.searchsorted(g, mu), 0, 100))
     mn, pn = _pr(bn)
@@ -2183,9 +2196,13 @@ with tab6:
     if True:
         if bundle_n and bundle_p:
             meta = bundle_n["meta"]
-            feat_cols = meta["feat_cols"]
+            # n형·p형 모델의 feature 집합이 다르므로(CROSS_EXCLUDE) 입력 폼은
+            # 두 모델 feature의 합집합을 받아 어느 쪽도 결측이 없도록 한다.
+            feat_cols = list(dict.fromkeys(
+                bundle_n["meta"]["feat_cols"] + bundle_p["meta"]["feat_cols"]))
             base_feats = [c for c in feat_cols if c not in _DERIVED]
-            medians = meta["medians"]
+            # 중앙값도 두 모델 것을 병합 (예측 시 결측 대치용)
+            medians = {**bundle_p["meta"]["medians"], **bundle_n["meta"]["medians"]}
 
             c1, c2 = st.columns(2)
             _r2n = bundle_n["meta"]["cv_r2_best"]
