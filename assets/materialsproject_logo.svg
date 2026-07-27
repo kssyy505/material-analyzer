@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 370">
+  <rect width="600" height="370" rx="0" fill="#2d3e50"/>
+  <g fill="none" stroke="#a9c6f2" stroke-width="11">
+    <circle cx="245" cy="62"  r="46"/>
+    <circle cx="355" cy="62"  r="46"/>
+    <circle cx="143" cy="137" r="46"/>
+    <circle cx="300" cy="137" r="46"/>
+    <circle cx="457" cy="137" r="46"/>
+    <circle cx="245" cy="212" r="46"/>
+    <circle cx="355" cy="212" r="46"/>
+  </g>
+  <g fill="#8fd6a8">
+    <path d="M245,32 C330,85 330,190 245,242 C160,190 160,85 245,32 Z
+             M245,60 C186,105 186,170 245,214 C304,170 304,105 245,60 Z"
+          fill-rule="evenodd"/>
+    <path d="M355,32 C440,85 440,190 355,242 C270,190 270,85 355,32 Z
+             M355,60 C296,105 296,170 355,214 C414,170 414,105 355,60 Z"
+          fill-rule="evenodd"/>
+  </g>
+  <text x="300" y="308" text-anchor="middle" fill="#ffffff"
+        font-family="Helvetica, Arial, sans-serif" font-size="42"
+        font-weight="bold">The Materials Project</text>
+  <text x="300" y="352" text-anchor="middle" fill="#e8eef5"
+        font-family="Helvetica, Arial, sans-serif" font-size="30"
+        font-weight="300">materialsproject.org</text>
+</svg>

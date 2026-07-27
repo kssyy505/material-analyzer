@@ -1,0 +1,11 @@
+streamlit>=1.32
+pandas
+numpy
+plotly
+matplotlib
+mp-api
+openpyxl
+xlrd
+scikit-learn>=1.5
+joblib
+reportlab
