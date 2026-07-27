@@ -79,6 +79,15 @@ section[data-testid="stSidebar"] {
 
 /* 소제목 색 */
 h3 { color: #123c78; }
+
+/* 제목 배너를 스크롤을 내려도 상단에 고정 (Streamlit 요소 컨테이너를 sticky로) */
+div[data-testid="stElementContainer"]:has(#hero-sticky) {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    background: #f5f8fc;
+    padding-top: 4px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -136,7 +145,7 @@ if _dku_uri:
 
 # ── 히어로 배너 (회로 + 칩 SVG) — 스크롤해도 상단 고정(sticky) ────────────────
 st.markdown(f"""
-<div style="position:sticky; top:0; z-index:1000; border-radius:14px;
+<div id="hero-sticky" style="position:relative; border-radius:14px;
             overflow:hidden; margin-bottom:1.2rem;
             box-shadow:0 4px 14px rgba(10,31,68,.25);">
 <svg viewBox="0 0 1000 150" preserveAspectRatio="xMidYMid slice"
