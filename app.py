@@ -2335,11 +2335,14 @@ with tab6:
             st.markdown("##### 3) 예측")
             if st.button("Mobility 예측 실행", icon=":material/play_circle:",
                          type="primary", use_container_width=True):
-                Xrow = pd.DataFrame([[full.get(c, medians.get(c))
-                                      for c in feat_cols]], columns=feat_cols)
-
                 def _predict(bundle):
-                    mu = float(np.expm1(bundle["model"].predict(Xrow)[0]))
+                    # 각 모델은 CROSS_EXCLUDE로 feature 집합이 다르므로
+                    # 자기 feature 순서대로 입력 행을 만든다.
+                    _fc = bundle["meta"]["feat_cols"]
+                    _med = bundle["meta"]["medians"]
+                    _Xrow = pd.DataFrame(
+                        [[full.get(c, _med.get(c)) for c in _fc]], columns=_fc)
+                    mu = float(np.expm1(bundle["model"].predict(_Xrow)[0]))
                     grid = np.asarray(bundle["meta"]["pct_grid"])
                     pctile = int(np.clip(np.searchsorted(grid, mu), 0, 100))
                     return max(mu, 0.0), pctile
