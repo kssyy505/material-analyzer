@@ -82,10 +82,63 @@ h3 { color: #123c78; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── 히어로 배너 (회로 + 칩 SVG) ──────────────────────────────────────────────
-st.markdown("""
-<div style="position:relative; border-radius:14px; overflow:hidden;
-            margin-bottom:1.2rem; box-shadow:0 4px 14px rgba(10,31,68,.25);">
+# ── 로고 임베드 헬퍼 (헤더에 PAND·DKU 로고를 넣기 위해 배너 앞에 정의) ──────
+import base64
+
+
+def _logo_data_uri(keywords):
+    """assets/ 또는 폴더에서 키워드에 맞는 로고를 찾아 data URI로 반환."""
+    exts = (".png", ".jpg", ".jpeg", ".webp", ".svg")
+    mimes = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+             ".webp": "image/webp", ".svg": "image/svg+xml"}
+    dirs = []
+    try:
+        _here = os.path.dirname(os.path.abspath(__file__))
+    except NameError:
+        _here = os.getcwd()
+    for base in (os.getcwd(), _here):
+        for sub in ("assets", ""):
+            d = os.path.join(base, sub) if sub else base
+            if os.path.isdir(d) and d not in dirs:
+                dirs.append(d)
+    for d in dirs:
+        try:
+            for f in sorted(os.listdir(d)):
+                n = f.lower()
+                if n.endswith(exts) and any(k in n for k in keywords):
+                    p = os.path.join(d, f)
+                    ext = os.path.splitext(p)[1].lower()
+                    b = base64.b64encode(open(p, "rb").read()).decode()
+                    return f"data:{mimes.get(ext, 'image/png')};base64,{b}"
+        except OSError:
+            continue
+    return ""
+
+
+_pand_uri = _logo_data_uri(["pand"])
+_dku_uri = _logo_data_uri(["dku", "dankook"])
+_hero_logos = ""
+# PAND 로고는 밝은 색이라 어두운 카드, DKU 로고는 진한 색이라 흰 카드에 배치
+if _pand_uri:
+    _hero_logos += (
+        f'<div style="background:#0a1f44; border:1px solid #2c4a7a; '
+        f'border-radius:8px; padding:8px 14px; height:74px; display:flex; '
+        f'align-items:center; box-shadow:0 2px 8px rgba(0,0,0,.25);">'
+        f'<img src="{_pand_uri}" style="height:48px; max-width:170px; '
+        f'object-fit:contain;"></div>')
+if _dku_uri:
+    _hero_logos += (
+        f'<div style="background:#ffffff; border-radius:8px; padding:6px 12px; '
+        f'height:74px; display:flex; align-items:center; '
+        f'box-shadow:0 2px 8px rgba(0,0,0,.25);">'
+        f'<img src="{_dku_uri}" style="height:62px; max-width:120px; '
+        f'object-fit:contain;"></div>')
+
+# ── 히어로 배너 (회로 + 칩 SVG) — 스크롤해도 상단 고정(sticky) ────────────────
+st.markdown(f"""
+<div style="position:sticky; top:0; z-index:1000; border-radius:14px;
+            overflow:hidden; margin-bottom:1.2rem;
+            box-shadow:0 4px 14px rgba(10,31,68,.25);">
 <svg viewBox="0 0 1000 150" preserveAspectRatio="xMidYMid slice"
      style="display:block; width:100%; height:150px;">
   <defs>
@@ -116,37 +169,7 @@ st.markdown("""
     <circle cx="760" cy="100" r="3.5"/><circle cx="150" cy="30" r="3"/>
     <circle cx="90" cy="75" r="3"/><circle cx="210" cy="120" r="3"/>
   </g>
-  <!-- 웨이퍼 -->
-  <g transform="translate(660,75)" opacity="0.35">
-    <circle r="52" fill="none" stroke="#93c5fd" stroke-width="1.5"/>
-    <g stroke="#93c5fd" stroke-width="0.8">
-      <line x1="-52" y1="-17" x2="52" y2="-17"/><line x1="-52" y1="0" x2="52" y2="0"/>
-      <line x1="-52" y1="17" x2="52" y2="17"/><line x1="-52" y1="34" x2="39" y2="34"/>
-      <line x1="-52" y1="-34" x2="39" y2="-34"/>
-      <line x1="-17" y1="-52" x2="-17" y2="52"/><line x1="0" y1="-52" x2="0" y2="52"/>
-      <line x1="17" y1="-52" x2="17" y2="52"/><line x1="34" y1="-39" x2="34" y2="39"/>
-      <line x1="-34" y1="-39" x2="-34" y2="39"/>
-    </g>
-  </g>
-  <!-- 칩 패키지 -->
-  <g transform="translate(860,38)">
-    <g stroke="#60a5fa" stroke-width="2.5" opacity="0.85">
-      <line x1="12" y1="-8" x2="12" y2="0"/><line x1="30" y1="-8" x2="30" y2="0"/>
-      <line x1="48" y1="-8" x2="48" y2="0"/><line x1="66" y1="-8" x2="66" y2="0"/>
-      <line x1="12" y1="74" x2="12" y2="82"/><line x1="30" y1="74" x2="30" y2="82"/>
-      <line x1="48" y1="74" x2="48" y2="82"/><line x1="66" y1="74" x2="66" y2="82"/>
-      <line x1="-8" y1="15" x2="0" y2="15"/><line x1="-8" y1="37" x2="0" y2="37"/>
-      <line x1="-8" y1="59" x2="0" y2="59"/>
-      <line x1="78" y1="15" x2="86" y2="15"/><line x1="78" y1="37" x2="86" y2="37"/>
-      <line x1="78" y1="59" x2="86" y2="59"/>
-    </g>
-    <rect width="78" height="74" rx="9" fill="url(#chipBody)"
-          stroke="#60a5fa" stroke-width="1.5"/>
-    <rect x="18" y="16" width="42" height="42" rx="5" fill="#081a3a"
-          stroke="#93c5fd" stroke-width="1"/>
-    <text x="39" y="43" text-anchor="middle" fill="#7dd3fc"
-          font-size="13" font-family="monospace" font-weight="bold">Si</text>
-  </g>
+  <!-- (웨이퍼·칩 패키지 장식은 로고와 겹치지 않도록 오른쪽에서 제거) -->
 </svg>
 <div style="position:absolute; top:50%; left:36px; transform:translateY(-50%);">
   <div style="display:flex; align-items:center; gap:12px; color:#fff;
@@ -161,6 +184,8 @@ st.markdown("""
   <div style="color:#aecdf2; font-size:.95rem; margin-top:4px;">
     Material Property Analyzer · Electronic Structure · Thermoelectric Screening</div>
 </div>
+<div style="position:absolute; top:50%; right:26px; transform:translateY(-50%);
+            display:flex; align-items:center; gap:14px;">{_hero_logos}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -220,17 +245,7 @@ def _logo_card(path, label, bg, border, img_h=88, pad="10px 20px", fill=False):
             f'font-size:1.1rem; letter-spacing:.5px;">{label}</div>')
 
 
-_sp_l, _logo_c1, _logo_c2, _sp_r = st.columns([1, 1.6, 1.6, 1])
-with _logo_c1:  # Materials Project 로고 — 카드에 꽉 채움
-    st.markdown(_logo_card(_find_logo(["materialsproject", "material", "mp_logo"]),
-                           "The Materials Project", "#2d3e50", "#2d3e50",
-                           fill=True),
-                unsafe_allow_html=True)
-with _logo_c2:  # PAND 로고 — 기존 크기 유지
-    st.markdown(_logo_card(_find_logo(["pand"]),
-                           "PAND · 물리학과", "#0a1f44", "#0a1f44",
-                           img_h=88, pad="10px 20px"),
-                unsafe_allow_html=True)
+# (PAND·DKU 로고는 상단 제목 배너(sticky header) 안으로 이동했습니다.)
 
 DATA_FILE = "merged_materials_Fermi.csv"
 
@@ -359,11 +374,31 @@ else:
              f"새로고침하세요: {', '.join(DATA_FILES)}")
     st.stop()
 
+# ── 데이터 출처 태그 (Materials Project) + M3D Hub 데이터 병합 ────────────────
+if "source" not in df.columns:
+    df["source"] = "Materials Project"
+_M3D_FILES = ("m3d_hub.csv.gz", "m3d_hub.csv")
+_m3d_path = next((f for f in _M3D_FILES if os.path.exists(f)), None)
+_n_m3d = 0
+if _m3d_path is not None:
+    try:
+        _m3d = load_data(_m3d_path)
+        if "source" not in _m3d.columns:
+            _m3d["source"] = "M3D Hub"
+        _n_m3d = len(_m3d)
+        # 공통 컬럼 정렬 후 세로 병합 (없는 컬럼은 NaN)
+        df = pd.concat([df, _m3d], ignore_index=True, sort=False)
+    except Exception as _e:
+        st.warning(f"M3D 데이터를 불러오지 못했습니다: {_e}")
+
 # ── 전역 필터: 금속 제외, 비금속(반도체·절연체)만 분석 대상으로 사용 ──────────
 _n_all = len(df)
 if "is_metal" in df.columns:
     df = df[df["is_metal"] == False].reset_index(drop=True)
 _n_nonmetal = len(df)
+# 출처별 개수 (개요 카드용)
+_n_mp = int((df["source"] == "Materials Project").sum()) if "source" in df.columns else _n_nonmetal
+_n_m3d_kept = int((df["source"] == "M3D Hub").sum()) if "source" in df.columns else 0
 
 # 자주 쓰는 컬럼 존재 여부
 HAS = {c: c in df.columns for c in
@@ -656,6 +691,15 @@ if st.session_state.view == "overview":
         "캐리어 타입(n/p)을 선택하면 해당 mobility 점수로 소재를 평가할 수 있습니다."
     )
 
+    # ── 데이터 분석 시작 버튼 (소개 바로 아래) ───────────────────────────────
+    _intro_b1, _intro_b2 = st.columns([1, 2.4])
+    with _intro_b1:
+        if st.button("데이터 분석 시작하기", icon=":material/analytics:",
+                     type="primary", use_container_width=True,
+                     key="start_top"):
+            st.session_state.view = "analysis"
+            st.rerun()
+
     # ── 플랫 카드 스타일 헬퍼 ────────────────────────────────────────────────
     _NO_BAR = {"displayModeBar": False}
 
@@ -728,61 +772,162 @@ if st.session_state.view == "overview":
             f'<div style="font-size:26px; font-weight:700; color:#0b1a30; '
             f'margin-top:6px;">{value}</div>{subhtml}</div>')
 
-    _mn = int(df["S_mu_n"].notna().sum()) if "S_mu_n" in df.columns else 0
-    _mp = int(df["S_mu_p"].notna().sum()) if "S_mu_p" in df.columns else 0
+    _src_col = df["source"] if "source" in df.columns else pd.Series(
+        ["Materials Project"] * len(df), index=df.index)
+    _is_mp = _src_col == "Materials Project"
+    _mp_n = int((df["S_mu_n"].notna() & _is_mp).sum()) if "S_mu_n" in df.columns else 0
+    _mp_p = int((df["S_mu_p"].notna() & _is_mp).sum()) if "S_mu_p" in df.columns else 0
+    _m3d_n = int((df.get("mobility_type") == "n-type").sum()) \
+        if "mobility_type" in df.columns else 0
+    _m3d_p = int((df.get("mobility_type") == "p-type").sum()) \
+        if "mobility_type" in df.columns else 0
+    _m3d_doped = int((df.get("doped_system") == "Yes").sum()) \
+        if "doped_system" in df.columns else 0
+    _m3d_undoped = max(0, _n_m3d_kept - _m3d_doped)
     _stable = (f"{int((df['is_stable'] == True).sum()):,}"
                if HAS["is_stable"] else "—")
-    _cards = (
-        _dcard("분석 대상 물질 수 (비금속)", f"{len(df):,}", "atom",
-               f"↓ 금속 {_n_all - _n_nonmetal:,}개 제외", "#2a78d6")
-        + _dcard("물성 변수 수", f"{df.shape[1]:,}", "columns", "", "#0e7490")
-        + _dcard("안정 상 (is_stable)", _stable, "shield", "", "#1baf7a")
-        + _dcard("mobility 점수 (n / p)", f"{_mn:,} / {_mp:,}", "chart", "",
-                 "#7f77dd"))
-    st.markdown(f'<div style="display:flex; gap:12px; margin-bottom:12px;">'
-                f'{_cards}</div>', unsafe_allow_html=True)
 
-    with st.container(border=True):
-        st.markdown('<p style="font-size:12px; color:#52514e; margin:2px 0 6px;">'
-                    '주요 물성 데이터 보유율 (coverage)</p>',
-                    unsafe_allow_html=True)
+    # 그래프를 제외한 데이터 카드는 모두 왼쪽, 구성 원소 분포는 오른쪽
+    _card_specs = [
+        ("M3D Hub 물질", f"{_n_m3d_kept:,}", "atom", "DKU·KIST 계산 DB", "#0e7490"),
+        ("mobility 점수 · n형", f"{_mp_n:,}", "chart", "S_mu_n (MP)", "#7f77dd"),
+        ("mobility 점수 · p형", f"{_mp_p:,}", "chart", "S_mu_p (MP)", "#9aa5b1"),
+        ("M3D n형 (electron)", f"{_m3d_n:,}", "chart", "mobility type", "#2a78d6"),
+        ("M3D p형 (hole)", f"{_m3d_p:,}", "chart", "mobility type", "#eb6834"),
+        ("M3D 실험 증명 (doped)", f"{_m3d_doped:,}", "shield",
+         "doped system = Yes", "#1baf7a"),
+        ("M3D 미증명", f"{_m3d_undoped:,}", "shield", "doped 아님", "#9aa5b1"),
+        ("물성 변수 수", f"{df.shape[1]:,}", "columns", "", "#0e7490"),
+    ]
+
+    _ovL, _ovR = st.columns([1.4, 1])
+    with _ovL:
+        _grid = "".join(_dcard(l, v, ic, s, c)
+                        for (l, v, ic, s, c) in _card_specs)
+        st.markdown(
+            '<div style="display:grid; grid-template-columns:1fr 1fr; '
+            f'gap:10px;">{_grid}</div>', unsafe_allow_html=True)
+
+        # 주요 물성 데이터 보유율 — 한 줄 정리
         _cov_items = [
-            ("밴드갭 (electronic_band_gap)", "electronic_band_gap", "#2a78d6"),
-            ("밴드 에지 (CBM/VBM · DOS 계산)", "cbm", "#2a78d6"),
-            ("열전 물성 (파워팩터 PF)", "PF_n", "#1baf7a"),
-            ("n형 mobility 점수 (S_mu_n)", "S_mu_n", "#7f77dd"),
-            ("p형 mobility 점수 (S_mu_p)", "S_mu_p", "#9aa5b1"),
+            ("밴드갭", "electronic_band_gap", "#2a78d6"),
+            ("밴드 에지(CBM/VBM)", "cbm", "#2a78d6"),
+            ("열전(PF)", "PF_n", "#1baf7a"),
+            ("S_mu_n", "S_mu_n", "#7f77dd"),
+            ("S_mu_p", "S_mu_p", "#9aa5b1"),
         ]
-        _bar_rows = ""
+        _chips = ""
         for _lab, _col, _clr in _cov_items:
             if _col not in df.columns:
                 continue
-            _pctv = df[_col].notna().mean() * 100
-            _bar_rows += (
-                f'<div style="display:flex; align-items:center; gap:10px; '
-                f'margin:4px 0;">'
-                f'<div style="flex:0 0 210px; font-size:12px; color:#0b0b0b;">'
-                f'{_lab}</div>'
-                f'<div style="flex:1; background:#eef1f6; border-radius:5px; '
-                f'height:14px; overflow:hidden;">'
-                f'<div style="width:{_pctv:.1f}%; background:{_clr}; '
-                f'height:100%;"></div></div>'
-                f'<div style="flex:0 0 46px; text-align:right; font-size:12px; '
-                f'font-weight:600; color:{_clr};">{_pctv:.0f}%</div></div>')
-        st.markdown(_bar_rows, unsafe_allow_html=True)
-        st.caption("출처: Materials Project 기반 병합 데이터셋 · "
-                   "밴드 에지·mobility 점수는 반도체(비금속) 물질 위주로 계산되어 "
-                   "보유율이 낮습니다.")
+            _cntv = int(df[_col].notna().sum())
+            _chips += (
+                f'<div style="flex:1; min-width:96px; background:#ffffff; '
+                f'border:1px solid #e4e9f2; border-radius:8px; padding:7px 9px;">'
+                f'<div style="font-size:10.5px; color:#5f6b7a;">{_lab}</div>'
+                f'<div style="font-size:17px; font-weight:700; color:{_clr};">'
+                f'{_cntv:,}<span style="font-size:10px; color:#8a97a8; '
+                f'font-weight:400;">개</span></div></div>')
+        st.markdown(
+            '<p style="font-size:12px; color:#52514e; margin:12px 0 5px;">'
+            '주요 물성 데이터 보유 물질 수 (coverage)</p>'
+            f'<div style="display:flex; gap:7px; flex-wrap:wrap;">{_chips}</div>',
+            unsafe_allow_html=True)
+
+    with _ovR:
+        _section("구성 원소 분포 (주기율표)", "#1baf7a")
+        with st.container(border=True):
+            _PT = {}
+
+            def _pt_add(row, els, sc):
+                for _i, _e in enumerate(els):
+                    if _e:
+                        _PT[_e] = (row, sc + _i)
+            _PT["H"] = (1, 1); _PT["He"] = (1, 18)
+            _pt_add(2, ["Li", "Be"], 1)
+            _pt_add(2, ["B", "C", "N", "O", "F", "Ne"], 13)
+            _pt_add(3, ["Na", "Mg"], 1)
+            _pt_add(3, ["Al", "Si", "P", "S", "Cl", "Ar"], 13)
+            _pt_add(4, ["K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
+                        "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr"], 1)
+            _pt_add(5, ["Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd",
+                        "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe"], 1)
+            _pt_add(6, ["Cs", "Ba"], 1); _PT["La"] = (6, 3)
+            _pt_add(6, ["Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
+                        "Pb", "Bi", "Po", "At", "Rn"], 4)
+            _pt_add(7, ["Fr", "Ra"], 1); _PT["Ac"] = (7, 3)
+            _pt_add(8, ["Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho",
+                        "Er", "Tm", "Yb", "Lu"], 4)
+            _elc = pd.Series(dtype=int)
+            if FORMULA_COL:
+                from collections import Counter
+                _cnt = Counter()
+                for _f in df[FORMULA_COL].dropna().astype(str):
+                    for _e in set(_ELEMENT_RE.findall(_f)):
+                        _cnt[_e] += 1
+                _elc = pd.Series(_cnt)
+            _SCALE = ["#e6f1fb", "#b5d4f4", "#6fa8dc", "#2a6db5", "#0a2c5e"]
+            _maxlog = float(np.log10(_elc.max() + 1)) if not _elc.empty else 1.0
+
+            def _cell_color(v):
+                if v <= 0:
+                    return "#f4f6fa"
+                frac = np.log10(v + 1) / (_maxlog or 1)
+                return _SCALE[max(0, min(4, int(frac * 5 - 1e-9)))]
+            _cells = ""
+            for _e, (_r, _cc) in _PT.items():
+                _v = int(_elc.get(_e, 0))
+                _bg = _cell_color(_v)
+                _dark = _v > 0 and (np.log10(_v + 1) / (_maxlog or 1)) >= 0.6
+                _fg = "#ffffff" if _dark else ("#1a2b45" if _v > 0 else "#c4ccd8")
+                _cells += (
+                    f'<div title="{_e}: {_v:,}회" style="grid-row:{_r}; '
+                    f'grid-column:{_cc}; background:{_bg}; border-radius:4px; '
+                    f'display:flex; align-items:center; justify-content:center; '
+                    f'aspect-ratio:1; font-size:11px; font-weight:600; '
+                    f'color:{_fg};">{_e}</div>')
+            _grid_pt = (
+                '<div style="display:grid; grid-template-columns:repeat(18, 1fr);'
+                ' gap:2px;">' + _cells + '</div>')
+            st.markdown(_grid_pt, unsafe_allow_html=True)
+            if not _elc.empty:
+                _top5 = ", ".join(f"{k}({v:,})" for k, v in
+                                  _elc.sort_values(ascending=False).head(5).items())
+                st.caption(f"최다 등장 원소: {_top5}")
+                # 원소를 선택하면 등장 물질 수를 표시 (셀에 마우스를 올려도 표시)
+                _el_opts = sorted(_PT.keys())
+                _el_sel = st.selectbox(
+                    "원소 선택 → 등장 물질 수 확인", _el_opts,
+                    index=_el_opts.index("O") if "O" in _el_opts else 0,
+                    key="ov_el_pick")
+                _el_cnt = int(_elc.get(_el_sel, 0))
+                st.markdown(
+                    f'<div style="background:#eef4fc; border:1px solid #cfe0f5; '
+                    f'border-radius:8px; padding:8px 12px; font-size:13px; '
+                    f'color:#0a1f44;"><b>{_el_sel}</b> 원소는 '
+                    f'<b>{_el_cnt:,}개</b> 물질에 등장합니다.</div>',
+                    unsafe_allow_html=True)
 
     st.markdown("---")
 
-    # ── 구조·결정 분포 (결정계 + 공간군) ────────────────────────────────────
+    # ── 구조·결정 분포 (전체 / mobility 상위 10% 선택) ───────────────────────
     _section("구조·결정 분포")
+    _struct_scope = st.radio(
+        "표시 범위", ["전체", "mobility 상위 10%"], horizontal=True,
+        key="ov_struct_scope",
+        help="mobility 상위 10%: S_mu_n·S_mu_p 중 큰 값 기준 상위 10% 물질")
+    _sdf = df
+    if _struct_scope.startswith("mobility") and {"S_mu_n", "S_mu_p"} <= set(df.columns):
+        _mmax = df[["S_mu_n", "S_mu_p"]].max(axis=1)
+        if _mmax.notna().any():
+            _thr = _mmax.quantile(0.90)
+            _sdf = df[_mmax >= _thr]
+    st.caption(f"현재 표시 대상: {len(_sdf):,}개 물질 ({_struct_scope})")
     c1, c2 = st.columns(2)
     with c1, st.container(border=True):
         if HAS["crystal_system"]:
             _card_title("결정계별 물질 수")
-            vc = df["crystal_system"].value_counts().sort_values().reset_index()
+            vc = _sdf["crystal_system"].value_counts().sort_values().reset_index()
             vc.columns = ["결정계", "물질 수"]
             fig = px.bar(vc, x="물질 수", y="결정계", orientation="h",
                          color="물질 수", color_continuous_scale="Blues",
@@ -794,9 +939,9 @@ if st.session_state.view == "overview":
             st.plotly_chart(_flat(fig, h=300), use_container_width=True,
                             config=_NO_BAR)
     with c2, st.container(border=True):
-        if "space_group_symbol" in df.columns:
+        if "space_group_symbol" in _sdf.columns:
             _card_title("공간군 Top 10")
-            sg = df["space_group_symbol"].value_counts().head(10)
+            sg = _sdf["space_group_symbol"].value_counts().head(10)
             sg = sg.sort_values().reset_index()
             sg.columns = ["공간군", "물질 수"]
             fig = px.bar(sg, x="물질 수", y="공간군", orientation="h",
@@ -807,44 +952,33 @@ if st.session_state.view == "overview":
             st.plotly_chart(_flat(fig, h=300), use_container_width=True,
                             config=_NO_BAR)
 
-    # ── 전자·열전 물성 (밴드갭 + mobility) ──────────────────────────────────
-    _section("전자·열전 물성")
+    # ── 밴드갭 분포 (n형 / p형 분리, 전체 / mobility 상위 10% 선택) ──────────
+    _section("밴드갭 분포 (캐리어 타입별)")
+    _bg_scope = st.radio(
+        "표시 범위 ", ["전체", "mobility 상위 10%"], horizontal=True,
+        key="ov_bg_scope",
+        help="mobility 상위 10%: 각 캐리어의 mobility 점수(S_mu) 상위 10% 물질")
     c3, c4 = st.columns(2)
-    with c3, st.container(border=True):
-        if HAS["electronic_band_gap"]:
-            _card_title("밴드갭 분포 (0 < Eg ≤ 8 eV)")
-            _semi = df[(df["electronic_band_gap"] > 0.001) &
-                       (df["electronic_band_gap"] <= 8)]
-            fig = px.histogram(_semi, x="electronic_band_gap", nbins=64,
-                               color_discrete_sequence=["#aac4e4"],
-                               labels={"electronic_band_gap": "밴드갭 (eV)"})
-            fig.update_layout(yaxis_title="물질 수", bargap=0.12,
-                              showlegend=False)
-            st.plotly_chart(_flat(fig, h=300), use_container_width=True,
-                            config=_NO_BAR)
-    with c4, st.container(border=True):
-        if HAS["electronic_band_gap"] and (
-                "S_mu_n" in df.columns or "S_mu_p" in df.columns):
-            _card_title("밴드갭 구간별 mobility 보유 물질 수")
-            _gap = df["electronic_band_gap"].clip(upper=8)
-            _edges = np.arange(0, 8.5, 0.5)
-            _mid = _edges[:-1] + 0.25
-            _rows = []
-            for _c, _lab in [("S_mu_n", "n-type"), ("S_mu_p", "p-type")]:
-                if _c in df.columns:
-                    _cnt, _ = np.histogram(
-                        _gap[df[_c].notna()].dropna(), bins=_edges)
-                    _rows += [{"밴드갭 (eV)": x, "물질 수": int(y), "타입": _lab}
-                              for x, y in zip(_mid, _cnt)]
-            fig = px.line(pd.DataFrame(_rows), x="밴드갭 (eV)", y="물질 수",
-                          color="타입", markers=True,
-                          color_discrete_sequence=["#2a78d6", "#eb6834"])
-            fig.update_traces(line_width=2, marker_size=5, line_shape="spline")
-            fig = _flat(fig, h=300)
-            fig.update_layout(legend=dict(  # 그래프 오른쪽 위 끝에 배치
-                orientation="h", yanchor="bottom", y=1.02,
-                xanchor="right", x=1, title=None, font=dict(size=11)))
-            st.plotly_chart(fig, use_container_width=True, config=_NO_BAR)
+    for _cc, _mcol, _title, _clr in [
+            (c3, "S_mu_n", "n형 물질 밴드갭 분포", "#2a78d6"),
+            (c4, "S_mu_p", "p형 물질 밴드갭 분포", "#eb6834")]:
+        with _cc, st.container(border=True):
+            if HAS["electronic_band_gap"] and _mcol in df.columns:
+                _card_title(_title)
+                _sub = df[(df["electronic_band_gap"] > 0.001) &
+                          (df["electronic_band_gap"] <= 8) &
+                          (df[_mcol].notna())]
+                if _bg_scope.startswith("mobility") and not _sub.empty:
+                    _thr = _sub[_mcol].quantile(0.90)
+                    _sub = _sub[_sub[_mcol] >= _thr]
+                fig = px.histogram(_sub, x="electronic_band_gap", nbins=60,
+                                   color_discrete_sequence=[_clr],
+                                   labels={"electronic_band_gap": "밴드갭 (eV)"})
+                fig.update_layout(yaxis_title="물질 수", bargap=0.12,
+                                  showlegend=False)
+                st.plotly_chart(_flat(fig, h=300), use_container_width=True,
+                                config=_NO_BAR)
+                st.caption(f"{_mcol} 보유 물질 {len(_sub):,}개 기준 ({_bg_scope})")
 
     with st.expander("데이터셋 주요 변수 설명", icon=":material/menu_book:"):
         st.markdown("""
@@ -865,155 +999,13 @@ if st.session_state.view == "overview":
     st.caption("위 통계는 전체 데이터(필터 미적용) 기준입니다. "
                "데이터 출처: Materials Project 기반 병합 데이터셋")
 
-    # ── 주기율표 히트맵 + 구조–물성 지형도 (같은 줄) ──────────────────
-    _ov_c1, _ov_c2 = st.columns([1.25, 1])
-    with _ov_c1:
-        # ── 주기율표 원소 빈도 히트맵 ────────────────────────────────────────────
-        _section("구성 원소 분포 (주기율표 히트맵)", "#1baf7a")
-        with st.container(border=True):
-            _card_title("데이터셋 물질에 등장하는 원소 빈도")
-            _PT = {}
-
-            def _pt_add(row, els, sc):
-                for _i, _e in enumerate(els):
-                    if _e:
-                        _PT[_e] = (row, sc + _i)
-            _PT["H"] = (1, 1); _PT["He"] = (1, 18)
-            _pt_add(2, ["Li", "Be"], 1)
-            _pt_add(2, ["B", "C", "N", "O", "F", "Ne"], 13)
-            _pt_add(3, ["Na", "Mg"], 1)
-            _pt_add(3, ["Al", "Si", "P", "S", "Cl", "Ar"], 13)
-            _pt_add(4, ["K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
-                        "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr"], 1)
-            _pt_add(5, ["Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd",
-                        "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe"], 1)
-            _pt_add(6, ["Cs", "Ba"], 1); _PT["La"] = (6, 3)
-            _pt_add(6, ["Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
-                        "Pb", "Bi", "Po", "At", "Rn"], 4)
-            _pt_add(7, ["Fr", "Ra"], 1); _PT["Ac"] = (7, 3)
-            _pt_add(7, ["Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh",
-                        "Fl", "Mc", "Lv", "Ts", "Og"], 4)
-            _pt_add(8, ["Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho",
-                        "Er", "Tm", "Yb", "Lu"], 4)
-            _pt_add(9, ["Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es",
-                        "Fm", "Md", "No", "Lr"], 4)
-
-            _elc = pd.Series(dtype=int)
-            if FORMULA_COL:
-                from collections import Counter
-                _cnt = Counter()
-                for _f in df[FORMULA_COL].dropna().astype(str):
-                    for _e in set(_ELEMENT_RE.findall(_f)):
-                        _cnt[_e] += 1
-                _elc = pd.Series(_cnt)
-
-            # log10(빈도)를 5단계로 나눠 이산 색상(연한 하늘 → 진한 남색)으로 매핑
-            _SCALE = ["#e6f1fb", "#b5d4f4", "#6fa8dc", "#2a6db5", "#0a2c5e"]
-            _maxlog = float(np.log10(_elc.max() + 1)) if not _elc.empty else 1.0
-
-            def _cell_color(v):
-                if v <= 0:
-                    return "#f4f6fa"     # 데이터셋에 없는 원소
-                frac = np.log10(v + 1) / (_maxlog or 1)
-                idx = min(4, int(frac * 5 - 1e-9))
-                return _SCALE[max(0, idx)]
-
-            _CELL = 40   # px, 정사각형 셀
-            _cells = ""
-            for _e, (_r, _cc) in _PT.items():
-                _v = int(_elc.get(_e, 0))
-                _bg = _cell_color(_v)
-                _dark = _v > 0 and (np.log10(_v + 1) / (_maxlog or 1)) >= 0.6
-                _fg = "#ffffff" if _dark else ("#1a2b45" if _v > 0 else "#c4ccd8")
-                _cells += (
-                    f'<div title="{_e}: {_v:,}회" style="grid-row:{_r}; '
-                    f'grid-column:{_cc}; background:{_bg}; border-radius:4px; '
-                    f'display:flex; align-items:center; justify-content:center; '
-                    f'aspect-ratio:1; font-size:12px; font-weight:600; '
-                    f'color:{_fg};">{_e}</div>')
-            _grid = (
-                '<div style="display:grid; grid-template-columns:repeat(18, 1fr); '
-                'gap:3px; max-width:760px;">' + _cells + '</div>')
-            # 이산 범례
-            _leg = ('<div style="display:flex; align-items:center; gap:6px; '
-                    'justify-content:flex-end; margin-top:10px; font-size:11px; '
-                    'color:#5f6b7a;"><span>log10(빈도)</span>'
-                    + "".join(f'<span style="width:22px; height:16px; '
-                              f'background:{c}; border-radius:3px; display:flex; '
-                              f'align-items:center; justify-content:center; '
-                              f'font-size:10px; color:{"#fff" if i>=3 else "#1a2b45"};">'
-                              f'{i}</span>' for i, c in enumerate(_SCALE))
-                    + '</div>')
-            st.markdown(_grid + _leg, unsafe_allow_html=True)
-            if not _elc.empty:
-                _top5 = ", ".join(f"{k}({v:,})" for k, v in
-                                  _elc.sort_values(ascending=False).head(5).items())
-                st.caption(f"가장 자주 등장하는 원소: {_top5} — 산화물(O) 계열이 "
-                           "데이터셋의 큰 비중을 차지합니다.")
-
-    with _ov_c2:
-        # ── 구조–물성 지형도 ────────────────────────────────────────────────────
-        _section("구조–물성 지형도 (Structure–Property Landscape)", "#1baf7a")
-        with st.container(border=True):
-            _card_title("밴드갭 vs 형성에너지 (색: 안정성)")
-            if {"electronic_band_gap", "formation_energy_per_atom"} <= set(df.columns):
-                _land = df.dropna(subset=["electronic_band_gap",
-                                          "formation_energy_per_atom"]).copy()
-                if len(_land) > 6000:
-                    _land = _land.sample(6000, random_state=42)
-                _color = None
-                if HAS["is_stable"]:
-                    _land["안정성"] = np.where(_land["is_stable"] == True,
-                                             "안정", "준안정")
-                    _color = "안정성"
-                _hover = [c for c in [FORMULA_COL, "material_id"] if c]
-                _fig = px.scatter(
-                    _land, x="electronic_band_gap", y="formation_energy_per_atom",
-                    color=_color,
-                    color_discrete_map={"안정": "#1baf7a", "준안정": "#eda100"},
-                    hover_data=_hover, opacity=0.5,
-                    labels={"electronic_band_gap": "밴드갭 (eV)",
-                            "formation_energy_per_atom": "형성에너지 (eV/atom)"})
-                _fig.update_traces(marker=dict(size=4))
-                st.plotly_chart(_flat(_fig, h=380, legend_h=True),
-                                use_container_width=True, config=_NO_BAR)
-                st.caption("좌하단(낮은 형성에너지·안정)일수록 합성에 유리하고, "
-                           "가로축 밴드갭이 소자 응용 범위를 결정합니다. "
-                           f"표시: {len(_land):,}개 (과밀 방지 위해 샘플링).")
-
-    # ── 열전 스크리닝 ────────────────────────────────────────────────────────
-    _section("열전 스크리닝 (Thermoelectric Screening)")
-    with st.container(border=True):
-        _card_title("전기전도도 vs 제베크 계수 (색: 파워팩터, n형·log축)")
-        if {"sigma_n", "S_n", "PF_n"} <= set(df.columns):
-            _te = df.dropna(subset=["sigma_n", "S_n", "PF_n"]).copy()
-            _te = _te[(_te["sigma_n"] > 0)]
-            _te["|S_n|"] = _te["S_n"].abs().clip(lower=1e-3)
-            if len(_te) > 6000:
-                _te = _te.sample(6000, random_state=42)
-            _hover = [c for c in [FORMULA_COL] if c]
-            _fig = px.scatter(
-                _te, x="sigma_n", y="|S_n|", color="PF_n",
-                color_continuous_scale="Turbo", opacity=0.55,
-                hover_data=_hover, log_x=True, log_y=True,
-                range_color=[0, _te["PF_n"].quantile(0.97)],
-                labels={"sigma_n": "전기전도도 σ (log)",
-                        "|S_n|": "|제베크 계수 S| (log)", "PF_n": "PF"})
-            _fig.update_traces(marker=dict(size=4))
-            _fig.update_layout(coloraxis_colorbar=dict(thickness=10, len=0.8))
-            st.plotly_chart(_flat(_fig, h=360), use_container_width=True,
-                            config=_NO_BAR)
-            st.caption("파워팩터 PF = S²σ. 오른쪽 위(높은 σ·높은 |S|)로 갈수록 "
-                       "열전 성능이 유망하며, 밝은 색(높은 PF) 물질이 후보입니다.")
-
     # ── Mobility 예측 모델 카드 ──────────────────────────────────────────────
     _section("Mobility 예측 모델 카드 (Machine Learning)", "#1baf7a")
     with st.container(border=True):
         _card_title("HistGradientBoosting 회귀 · log(1+μ) 학습")
-        st.caption("아래 버튼을 누르면 이 PC에서 모델을 학습·평가하고 "
-                   "성능과 주요 feature 중요도를 표시합니다 (최초 1회 수 초 소요).")
-        if st.button("모델 성능·중요도 계산", icon=":material/insights:",
-                     use_container_width=True):
+        st.caption("모델 성능과 AI feature 중요도를 미리 계산해 표시합니다 "
+                   "(최초 1회 수 초~수십 초 소요, 이후 캐시).")
+        with st.spinner("Mobility 모델 학습·중요도 계산 중..."):
             try:
                 _mb = get_mobility_models()
                 _bn, _bp = _mb.get("n-type"), _mb.get("p-type")
@@ -1065,13 +1057,6 @@ if st.session_state.view == "overview":
             except Exception as e:
                 st.error(f"모델 계산 실패: {e}")
 
-    st.markdown("")
-    _b1, _b2, _b3 = st.columns([1.5, 2, 1.5])
-    with _b2:
-        if st.button("데이터 분석 시작하기", icon=":material/analytics:",
-                     type="primary", use_container_width=True):
-            st.session_state.view = "analysis"
-            st.rerun()
     st.stop()  # 개요 페이지에서는 아래 분석 UI를 렌더링하지 않음
 
 # ── 분석 페이지: 사이드바 상단에 개요 복귀 버튼 ──────────────────────────────
@@ -1120,6 +1105,14 @@ else:
 # ──────────────────────────────────────────────────────────────────────────────
 st.sidebar.header(":material/tune: 데이터 필터 조건")
 filtered_df = df.copy()
+
+# ── 데이터 출처 필터 (Materials Project / M3D Hub) — 모든 분석에 적용 ────────
+if "source" in df.columns:
+    _src_opts = ["전체", "Materials Project", "M3D Hub"]
+    _src_sel = st.sidebar.radio("데이터 출처", _src_opts, index=0,
+                                help="MP 물질과 M3D Hub 물질을 구분해 분석합니다.")
+    if _src_sel != "전체":
+        filtered_df = filtered_df[filtered_df["source"] == _src_sel]
 
 if HAS["crystal_system"]:
     all_crystals = sorted(df["crystal_system"].dropna().unique().tolist())
@@ -1457,26 +1450,44 @@ def fetch_fatband_from_mp(material_id, api_key, mode="element"):
     return fig, _gap, has_proj
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+# 상위 탭: 데이터 탐색 · DOS 상세 분석 · Mobility 예측 · 기타
+# '기타' 안에 전자 구조 분석 · 물성 스크리닝 · 상관관계 히트맵 · 관심목록을 배치
+tab1, tab5, tab6, _tab_etc = st.tabs([
     ":material/table_chart: 데이터 탐색",
-    ":material/bolt: 전자 구조 분석",
-    ":material/science: 물성 스크리닝",
-    ":material/grid_on: 상관관계 히트맵",
     ":material/query_stats: DOS 상세 분석",
     ":material/neurology: Mobility 예측",
-    ":material/bookmark_star: 관심목록·랭킹",
+    ":material/apps: 기타",
 ])
+with _tab_etc:
+    tab2, tab3, tab4, tab7 = st.tabs([
+        ":material/bolt: 전자 구조 분석",
+        ":material/science: 물성 스크리닝",
+        ":material/grid_on: 상관관계 히트맵",
+        ":material/bookmark_star: 관심목록·랭킹",
+    ])
 
 # ── Tab 1: 데이터 탐색 ────────────────────────────────────────────────────────
 with tab1:
     st.subheader("데이터 필터링 결과")
-    show_cols = [c for c in ["material_id", FORMULA_COL, "crystal_system",
-                             "electronic_band_gap", "e_fermi", "volume"]
+    show_cols = [c for c in ["material_id", "source", FORMULA_COL,
+                             "crystal_system", "electronic_band_gap",
+                             "e_fermi", "volume"]
                  if c and c in filtered_df.columns]
     for _mc in MOB_SCORE_COLS:  # 선택된 캐리어 타입의 mobility 점수(들)
         if _mc in filtered_df.columns:
             show_cols.append(_mc)
     display_df = filtered_df.drop(columns=["_elements"], errors="ignore")
+
+    # 항상 선택한 캐리어의 mobility 점수 랭킹(내림차순) 순으로 정렬
+    _sort_cols = [c for c in MOB_SCORE_COLS if c in display_df.columns]
+    if _sort_cols:
+        _mkey = display_df[_sort_cols].max(axis=1)
+        display_df = (display_df.assign(_mob_rank=_mkey)
+                      .sort_values("_mob_rank", ascending=False,
+                                   na_position="last")
+                      .drop(columns="_mob_rank").reset_index(drop=True))
+        st.caption(f"※ {' / '.join(_sort_cols)} 기준 mobility 점수 "
+                   "높은 순으로 정렬했습니다.")
 
     # 표시할 컬럼 직접 선택 (기본값: 핵심 컬럼 + mobility 점수)
     _all_cols = display_df.columns.tolist()
@@ -2234,192 +2245,6 @@ with tab6:
                            f"(log(1+μ) 학습, n={bundle_n['meta']['n_train']:,} / "
                            f"{bundle_p['meta']['n_train']:,})")
 
-                # ── 활용 분야 추천 ────────────────────────────
-                st.markdown("---")
-                st.markdown("##### :material/recommend: 활용 분야 추천")
-                gap = full.get("electronic_band_gap", np.nan)
-                direct = bool(round(full.get("is_gap_direct", 0) or 0))
-                eah = full.get("energy_above_hull", np.nan)
-                mu_hi = max(pn, pp)          # 더 우세한 캐리어 백분위
-                _trans = "직접천이형" if direct else "간접천이형"
-
-                def _wl(g):
-                    return 1240.0 / g if g and g > 0 else float("inf")
-
-                apps = []   # (분야, 적합도0~100, 근거, 핵심 스펙)
-                if gap is None or pd.isna(gap):
-                    st.info("밴드갭 값이 없어 추천을 생성할 수 없습니다.")
-                else:
-                    if gap <= 0.05:
-                        apps.append(("전극·배선 (도전체)", 68,
-                            "밴드갭이 0에 가까워 반도체 소자보다 전도체로 분류됩니다. "
-                            "저저항 배선·접점 용도.", f"Eg ≈ {gap:.2f} eV"))
-                    if 0.05 < gap <= 0.7:
-                        _s = 45 + (mu_hi - 50) * 0.6
-                        apps.append(("열전 변환 소재 (Thermoelectric)",
-                            min(95, max(30, _s)),
-                            "좁은 밴드갭은 상온 부근 캐리어 여기가 쉬워 제베크 효과 "
-                            "기반 열전 발전/냉각에 유리합니다. 파워팩터(S²σ)와 "
-                            "열전도도 κ를 함께 확인해야 ZT를 판단할 수 있습니다.",
-                            f"Eg = {gap:.2f} eV · 우세 mobility 상위 "
-                            f"{100 - mu_hi:.0f}%"))
-                    if 0.1 <= gap <= 0.9:
-                        apps.append(("적외선(IR) 광검출·열화상", 62,
-                            f"밴드갭 대응 흡수/발광 파장은 약 {_wl(gap):.0f} nm "
-                            "(근~중적외선)로, IR 검출기·열화상 센서 후보입니다.",
-                            f"λ_edge ≈ {_wl(gap):.0f} nm"))
-                    if 0.9 <= gap <= 1.9:
-                        _dist = abs(gap - 1.34)
-                        _s = 100 - _dist * 70 + (8 if direct else -10)
-                        apps.append(("태양전지 광흡수층", min(98, max(35, _s)),
-                            f"단일접합 이론 최적 밴드갭(Shockley–Queisser ~1.34 eV) "
-                            f"대비 {'매우 근접' if _dist < 0.2 else '부분 부합'}. "
-                            + ("직접천이라 얇은 흡수층으로도 효율적 흡수가 가능합니다."
-                               if direct else
-                               "간접천이라 충분한 흡수를 위해 두꺼운 흡수층이 "
-                               "필요할 수 있습니다."),
-                            f"Eg = {gap:.2f} eV · λ_edge ≈ {_wl(gap):.0f} nm"))
-                    if 0.4 <= gap <= 2.5 and mu_hi >= 60:
-                        apps.append(("트랜지스터 채널 (로직·RF)",
-                            min(96, 50 + (mu_hi - 60) * 0.9),
-                            "적정 밴드갭과 상위권 이동도의 조합으로 FET 채널 후보. "
-                            "실제 on/off 비·문턱전압은 도핑·계면 품질에 좌우됩니다.",
-                            f"Eg = {gap:.2f} eV · 이동도 상위 {100 - mu_hi:.0f}%"))
-                    if 1.6 <= gap <= 3.3 and direct:
-                        _band = ("적색" if gap < 2.0 else
-                                 "녹~청색" if gap < 2.8 else "청~근자외")
-                        apps.append(("가시광 LED·레이저 다이오드", 74,
-                            "직접천이형이라 방사 재결합 효율이 높아 발광 소자에 "
-                            f"유리합니다. 발광 파장 약 {_wl(gap):.0f} nm.",
-                            f"λ ≈ {_wl(gap):.0f} nm ({_band}대)"))
-                    if 1.8 <= gap <= 3.2:
-                        apps.append(("광촉매·물분해 (Photocatalysis)", 56,
-                            "물분해 이론 문턱(1.23 eV)에 과전압을 더한 범위를 "
-                            "만족합니다. 실제 성능은 CBM/VBM의 산화·환원 준위 "
-                            "정렬에 크게 의존하므로 밴드 위치 검증이 필요합니다.",
-                            f"Eg = {gap:.2f} eV"))
-                    if 3.1 <= gap <= 4.5:
-                        apps.append(("자외선(UV) 검출·광소자", 60,
-                            f"UV 대역(λ ≈ {_wl(gap):.0f} nm) 감지에 적합한 넓은 "
-                            "밴드갭으로, solar-blind UV 검출기 후보입니다.",
-                            f"λ ≈ {_wl(gap):.0f} nm"))
-                    if gap >= 2.3 and pn >= 60:
-                        apps.append(("전력 반도체 (고전압 스위칭·WBG)",
-                            min(96, 55 + (pn - 60) * 0.8),
-                            "넓은 밴드갭은 높은 항복전계와 고온 동작에 유리하며, "
-                            "상위권 전자 이동도는 도통손실 저감에 기여합니다 "
-                            "(SiC·GaN 계열과 유사한 조건).",
-                            f"Eg = {gap:.2f} eV · n형 상위 {100 - pn:.0f}%"))
-                    if gap >= 3.0 and pn >= 65:
-                        apps.append(("투명 전도막 (TCO)", 64,
-                            "가시광 투과(넓은 갭)와 전자 전도(상위 이동도)를 겸비해 "
-                            "디스플레이·태양전지 투명전극 후보입니다.",
-                            f"Eg = {gap:.2f} eV · n형 상위 {100 - pn:.0f}%"))
-                    if gap >= 4.5 and mu_hi < 50:
-                        apps.append(("게이트 유전체·절연막", 62,
-                            "매우 넓은 밴드갭과 낮은 이동도는 누설전류 억제·절연 "
-                            "특성에 부합합니다.", f"Eg = {gap:.2f} eV"))
-                    if gap >= 3.5 and direct:
-                        apps.append(("신틸레이터 (방사선 검출)", 46,
-                            "넓은 직접 밴드갭은 고에너지 광자에 대한 발광 기반 "
-                            "검출에 활용될 수 있습니다.", f"Eg = {gap:.2f} eV"))
-
-                    if not apps:
-                        apps.append(("범용 반도체 (다이오드·센서)", 40,
-                            f"{_trans} 반도체이나 특화 용도의 정량 조건에는 "
-                            "미달합니다. 정류·범용 센서 등에 활용 가능합니다.",
-                            f"Eg = {gap:.2f} eV"))
-
-                    apps.sort(key=lambda a: a[1], reverse=True)
-
-                    def _fit(sc):
-                        if sc >= 70:
-                            return "적합도 높음", "#1baf7a", "#eafaf3"
-                        if sc >= 50:
-                            return "적합도 중간", "#2a78d6", "#e9f1fb"
-                        return "참고 수준", "#888780", "#f1efe8"
-
-                    # 1차 추천 (강조 카드)
-                    _t = apps[0]
-                    _lv, _clr, _bg = _fit(_t[1])
-                    st.markdown(
-                        f'<div style="border:1px solid {_clr}; border-left:5px '
-                        f'solid {_clr}; background:{_bg}; border-radius:10px; '
-                        f'padding:12px 16px; margin:6px 0;">'
-                        f'<div style="display:flex; justify-content:space-between; '
-                        f'align-items:center;">'
-                        f'<span style="font-size:15px; font-weight:600; '
-                        f'color:#0b0b0b;">'
-                        f'<svg width="15" height="15" viewBox="0 0 24 24" '
-                        f'fill="{_clr}" style="vertical-align:-2px;'
-                        f'margin-right:5px;"><path d="M12 2l2.9 6.9 7.1.6-5.4 '
-                        f'4.7 1.6 7L12 17.8 5.8 21.2l1.6-7L2 9.5l7.1-.6z"/>'
-                        f'</svg>1차 추천 · {_t[0]}</span>'
-                        f'<span style="background:{_clr}; color:#fff; '
-                        f'font-size:11px; font-weight:600; padding:2px 10px; '
-                        f'border-radius:10px;">{_lv} {_t[1]:.0f}/100</span></div>'
-                        f'<div style="font-size:13px; color:#33322f; '
-                        f'margin-top:6px;">{_t[2]}</div>'
-                        f'<div style="font-size:12px; color:#52514e; '
-                        f'margin-top:4px;">핵심 스펙: {_t[3]}</div></div>',
-                        unsafe_allow_html=True)
-
-                    # 추가 후보
-                    if len(apps) > 1:
-                        st.markdown('<p style="font-size:13px; font-weight:600; '
-                                    'color:#52514e; margin:10px 0 4px;">'
-                                    '추가 후보</p>', unsafe_allow_html=True)
-                        for _a in apps[1:6]:
-                            _lv, _clr, _ = _fit(_a[1])
-                            st.markdown(
-                                f'<div style="border-left:3px solid {_clr}; '
-                                f'padding:4px 12px; margin:5px 0;">'
-                                f'<span style="font-weight:600; color:#0b0b0b;">'
-                                f'{_a[0]}</span> '
-                                f'<span style="color:{_clr}; font-size:12px; '
-                                f'font-weight:600;">({_lv} {_a[1]:.0f})</span>'
-                                f'<br><span style="font-size:12.5px; '
-                                f'color:#33322f;">{_a[2]}</span>'
-                                f'<br><span style="font-size:12px; '
-                                f'color:#888780;">{_a[3]}</span></div>',
-                                unsafe_allow_html=True)
-
-                    # 캐리어 설계 방향
-                    if pn >= 70 and pp < 50:
-                        _dope = ("**n형(도너 도핑) 우선** — 전자 수송이 뚜렷이 "
-                                 "우세합니다.")
-                    elif pp >= 70 and pn < 50:
-                        _dope = ("**p형(억셉터 도핑) 우선** — 정공 수송이 뚜렷이 "
-                                 "우세합니다.")
-                    elif pn >= 65 and pp >= 65:
-                        _dope = ("**양극성(ambipolar)·CMOS 가능** — 전자·정공 "
-                                 "이동도가 모두 우수합니다.")
-                    else:
-                        _dope = ("**뚜렷한 우세 캐리어 없음** — 도핑 전략 최적화가 "
-                                 "필요합니다.")
-                    st.markdown(f"**캐리어 설계 방향**: {_dope} "
-                                f"(n형 상위 {100 - pn}% · p형 상위 {100 - pp}%)")
-
-                    # 안정성/합성성
-                    if eah is not None and pd.notna(eah):
-                        if eah <= 0.025:
-                            st.markdown("**합성 가능성**: energy above hull "
-                                        f"{eah * 1000:.0f} meV/atom — 열역학적으로 "
-                                        "안정에 가까워 합성 가능성이 높습니다.")
-                        elif eah <= 0.1:
-                            st.markdown("**합성 가능성**: energy above hull "
-                                        f"{eah * 1000:.0f} meV/atom — 준안정 상. "
-                                        "합성은 가능하나 조건 최적화가 필요할 수 "
-                                        "있습니다.")
-                        else:
-                            st.markdown("**합성 가능성**: energy above hull "
-                                        f"{eah * 1000:.0f} meV/atom — 불안정 경향. "
-                                        "실제 합성이 어려울 수 있습니다.")
-
-                st.caption(":material/warning: 적합도 점수는 밴드갭·직접천이 여부·예측 이동도 "
-                           "백분위·안정성 지표를 조합한 규칙 기반 정성 지표입니다. "
-                           "광흡수계수·결함·도핑 한계·밴드 정렬·계면 등 실제 소자 "
-                           "성능을 좌우하는 요소는 별도 검증이 필요합니다.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
