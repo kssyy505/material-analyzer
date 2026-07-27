@@ -1003,9 +1003,11 @@ if st.session_state.view == "overview":
     _section("Mobility 예측 모델 카드 (Machine Learning)", "#1baf7a")
     with st.container(border=True):
         _card_title("HistGradientBoosting 회귀 · log(1+μ) 학습")
-        st.caption("모델 성능과 AI feature 중요도를 미리 계산해 표시합니다 "
-                   "(최초 1회 수 초~수십 초 소요, 이후 캐시).")
-        with st.spinner("Mobility 모델 학습·중요도 계산 중..."):
+        st.caption("아래 버튼을 누르면 서버에서 모델을 학습·평가하고 성능과 "
+                   "AI feature 중요도를 표시합니다 (배포 환경 안정성을 위해 "
+                   "부팅 시 자동 실행하지 않습니다).")
+        if st.button("모델 성능·AI feature 중요도 계산",
+                     icon=":material/insights:", use_container_width=True):
             try:
                 _mb = get_mobility_models()
                 _bn, _bp = _mb.get("n-type"), _mb.get("p-type")
