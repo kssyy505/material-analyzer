@@ -898,19 +898,26 @@ if st.session_state.view == "overview":
                     return "#f4f6fa"
                 frac = np.log10(v + 1) / (_maxlog or 1)
                 return _SCALE[max(0, min(4, int(frac * 5 - 1e-9)))]
+            # 선택된 원소 (주기율표 셀 클릭 → ?el=원소 쿼리파라미터)
+            _q_el = st.query_params.get("el")
+            _sel_el = _q_el if (_q_el in _elc.index or _q_el in _PT) else (
+                "O" if "O" in _PT else next(iter(_PT)))
             _cells = ""
             for _e, (_r, _cc) in _PT.items():
                 _v = int(_elc.get(_e, 0))
                 _bg = _cell_color(_v)
                 _dark = _v > 0 and (np.log10(_v + 1) / (_maxlog or 1)) >= 0.6
                 _fg = "#ffffff" if _dark else ("#1a2b45" if _v > 0 else "#c4ccd8")
+                _selborder = ("outline:3px solid #eb6834; outline-offset:-1px;"
+                              if _e == _sel_el else "")
                 _cells += (
-                    f'<div class="ptcell" title="{_e}: {_v:,}개 물질" '
-                    f'style="grid-row:{_r}; '
-                    f'grid-column:{_cc}; background:{_bg}; border-radius:4px; '
-                    f'display:flex; align-items:center; justify-content:center; '
-                    f'aspect-ratio:1; font-size:11px; font-weight:600; '
-                    f'color:{_fg};">{_e}</div>')
+                    f'<a class="ptcell" href="?el={_e}" target="_self" '
+                    f'title="{_e}: {_v:,}개 물질 (클릭해서 선택)" '
+                    f'style="grid-row:{_r}; grid-column:{_cc}; background:{_bg}; '
+                    f'border-radius:4px; display:flex; align-items:center; '
+                    f'justify-content:center; aspect-ratio:1; font-size:11px; '
+                    f'font-weight:600; text-decoration:none; color:{_fg}; '
+                    f'{_selborder}">{_e}</a>')
             _grid_pt = (
                 '<div style="display:grid; grid-template-columns:repeat(18, 1fr);'
                 ' gap:2px;">' + _cells + '</div>')
@@ -919,12 +926,13 @@ if st.session_state.view == "overview":
                 _top5 = ", ".join(f"{k}({v:,})" for k, v in
                                   _elc.sort_values(ascending=False).head(5).items())
                 st.caption(f"최다 등장 원소: {_top5}")
-                # 원소 선택 → 요약 카드 (개수·평균 물성·상위 물질)
-                _el_opts = sorted(_elc.index.tolist()) or sorted(_PT.keys())
-                _el_sel = st.selectbox(
-                    "원소 선택 → 요약 보기", _el_opts,
-                    index=_el_opts.index("O") if "O" in _el_opts else 0,
-                    key="ov_el_pick")
+                # 주기율표 셀을 클릭하면 그 원소가 선택됩니다.
+                _el_sel = _sel_el
+                st.markdown(
+                    f'<p style="font-size:12px; color:#5f6b7a; margin:2px 0 6px;">'
+                    f'주기율표 원소를 <b>클릭</b>하면 요약이 바뀝니다 · 현재 선택: '
+                    f'<b style="color:#eb6834;">{_el_sel}</b></p>',
+                    unsafe_allow_html=True)
                 if "_elements" in df.columns:
                     _emask = df["_elements"].map(lambda s: _el_sel in s
                                                  if isinstance(s, (set, frozenset))
