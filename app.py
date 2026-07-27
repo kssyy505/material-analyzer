@@ -779,22 +779,23 @@ if st.session_state.view == "overview":
     }
 
     def _dcard(label, value, icon, sub="", clr="#2a78d6"):
-        svg = (f'<svg width="25" height="25" viewBox="0 0 24 24" fill="none" '
-               f'stroke="{clr}" stroke-width="1.7" stroke-linecap="round" '
+        svg = (f'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
+               f'stroke="{clr}" stroke-width="1.8" stroke-linecap="round" '
                f'stroke-linejoin="round">{_IC[icon]}</svg>')
-        subhtml = (f'<div style="font-size:11px; color:#8a97a8; margin-top:6px;">'
+        subhtml = (f'<div style="font-size:9.5px; color:#8a97a8; margin-top:2px;">'
                    f'{sub}</div>' if sub else "")
         return (
             '<div style="flex:1; background:#ffffff; border:1px solid #e4e9f2; '
-            'border-radius:12px; padding:14px 16px;">'
+            'border-radius:9px; padding:8px 10px;">'
             '<div style="display:flex; justify-content:space-between; '
             'align-items:center;">'
-            f'<span style="font-size:12.5px; color:#5f6b7a;">{label}</span>'
-            f'<span style="width:42px; height:42px; border-radius:10px; '
+            f'<span style="font-size:10.5px; color:#5f6b7a; line-height:1.2;">'
+            f'{label}</span>'
+            f'<span style="width:28px; height:28px; border-radius:7px; '
             f'background:{clr}14; display:flex; align-items:center; '
-            f'justify-content:center;">{svg}</span></div>'
-            f'<div style="font-size:26px; font-weight:700; color:#0b1a30; '
-            f'margin-top:6px;">{value}</div>{subhtml}</div>')
+            f'justify-content:center; flex:0 0 auto;">{svg}</span></div>'
+            f'<div style="font-size:19px; font-weight:700; color:#0b1a30; '
+            f'margin-top:2px;">{value}</div>{subhtml}</div>')
 
     _src_col = df["source"] if "source" in df.columns else pd.Series(
         ["Materials Project"] * len(df), index=df.index)
@@ -824,13 +825,58 @@ if st.session_state.view == "overview":
         ("물성 변수 수", f"{df.shape[1]:,}", "columns", "", "#0e7490"),
     ]
 
-    _ovL, _ovR = st.columns([1.4, 1])
+    # ── 주기율표 데이터 + 선택 원소 (네이티브 버튼 클릭으로 갱신 · 새로고침 없음) ─
+    _PT = {}
+
+    def _pt_add(row, els, sc):
+        for _i, _e in enumerate(els):
+            if _e:
+                _PT[_e] = (row, sc + _i)
+    _PT["H"] = (1, 1); _PT["He"] = (1, 18)
+    _pt_add(2, ["Li", "Be"], 1)
+    _pt_add(2, ["B", "C", "N", "O", "F", "Ne"], 13)
+    _pt_add(3, ["Na", "Mg"], 1)
+    _pt_add(3, ["Al", "Si", "P", "S", "Cl", "Ar"], 13)
+    _pt_add(4, ["K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
+                "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr"], 1)
+    _pt_add(5, ["Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd",
+                "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe"], 1)
+    _pt_add(6, ["Cs", "Ba"], 1); _PT["La"] = (6, 3)
+    _pt_add(6, ["Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
+                "Pb", "Bi", "Po", "At", "Rn"], 4)
+    _pt_add(7, ["Fr", "Ra"], 1); _PT["Ac"] = (7, 3)
+    _pt_add(8, ["Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho",
+                "Er", "Tm", "Yb", "Lu"], 4)
+    _elc = pd.Series(dtype=int)
+    if FORMULA_COL:
+        from collections import Counter
+        _cnt = Counter()
+        for _f in df[FORMULA_COL].dropna().astype(str):
+            for _e in set(_ELEMENT_RE.findall(_f)):
+                _cnt[_e] += 1
+        _elc = pd.Series(_cnt)
+    _SCALE = ["#e6f1fb", "#b5d4f4", "#6fa8dc", "#2a6db5", "#0a2c5e"]
+    _maxlog = float(np.log10(_elc.max() + 1)) if not _elc.empty else 1.0
+
+    def _cell_color(v):
+        if v <= 0:
+            return "#f4f6fa"
+        frac = np.log10(v + 1) / (_maxlog or 1)
+        return _SCALE[max(0, min(4, int(frac * 5 - 1e-9)))]
+
+    def _pick_el(e):
+        st.session_state["ov_sel_el"] = e
+    if "ov_sel_el" not in st.session_state:
+        st.session_state["ov_sel_el"] = "O" if "O" in _PT else next(iter(_PT), "O")
+    _sel_el = st.session_state["ov_sel_el"]
+
+    _ovL, _ovR = st.columns([1, 1.05])
     with _ovL:
         _grid = "".join(_dcard(l, v, ic, s, c)
                         for (l, v, ic, s, c) in _card_specs)
         st.markdown(
             '<div style="display:grid; grid-template-columns:1fr 1fr; '
-            f'gap:10px;">{_grid}</div>', unsafe_allow_html=True)
+            f'gap:8px;">{_grid}</div>', unsafe_allow_html=True)
 
         # 주요 물성 데이터 보유율 — 한 줄 정리
         _cov_items = [
@@ -846,142 +892,120 @@ if st.session_state.view == "overview":
                 continue
             _cntv = int(df[_col].notna().sum())
             _chips += (
-                f'<div style="flex:1; min-width:96px; background:#ffffff; '
-                f'border:1px solid #e4e9f2; border-radius:8px; padding:7px 9px;">'
-                f'<div style="font-size:10.5px; color:#5f6b7a;">{_lab}</div>'
-                f'<div style="font-size:17px; font-weight:700; color:{_clr};">'
-                f'{_cntv:,}<span style="font-size:10px; color:#8a97a8; '
+                f'<div style="flex:1; min-width:82px; background:#ffffff; '
+                f'border:1px solid #e4e9f2; border-radius:8px; padding:6px 8px;">'
+                f'<div style="font-size:10px; color:#5f6b7a;">{_lab}</div>'
+                f'<div style="font-size:15px; font-weight:700; color:{_clr};">'
+                f'{_cntv:,}<span style="font-size:9px; color:#8a97a8; '
                 f'font-weight:400;">개</span></div></div>')
         st.markdown(
-            '<p style="font-size:12px; color:#52514e; margin:12px 0 5px;">'
+            '<p style="font-size:11px; color:#52514e; margin:10px 0 4px;">'
             '주요 물성 데이터 보유 물질 수 (coverage)</p>'
-            f'<div style="display:flex; gap:7px; flex-wrap:wrap;">{_chips}</div>',
+            f'<div style="display:flex; gap:6px; flex-wrap:wrap;">{_chips}</div>',
             unsafe_allow_html=True)
 
     with _ovR:
-        _section("구성 원소 분포 (주기율표)", "#1baf7a")
-        with st.container(border=True):
-            _PT = {}
-
-            def _pt_add(row, els, sc):
-                for _i, _e in enumerate(els):
+        # ── 구성 원소 분포 (주기율표) — 원소 버튼 클릭으로 선택 (새로고침 없음) ──
+        _section("구성 원소 분포 (주기율표) · 원소를 클릭해 선택", "#1baf7a")
+        # 정사각형 셀 + 좁은 간격 + 그리드 최대 너비 고정(셀이 과도하게 커지지 않게)
+        _btn_css = ("div[class*='st-key-ptbtn_'] button{padding:0!important;"
+                    "min-height:0!important;height:auto!important;"
+                    "aspect-ratio:1!important;width:100%!important;"
+                    "font-size:12px!important;font-weight:700!important;"
+                    "border-radius:5px!important;line-height:1!important;"
+                    "transition:transform .08s ease, box-shadow .08s ease, "
+                    "filter .08s ease!important;}"
+                    "div[class*='st-key-ptbtn_'] button p{margin:0!important;"
+                    "line-height:1!important;font-size:12px!important;}"
+                    "div[class*='st-key-ptbtn_']{width:100%!important;}"
+                    # 마우스를 올리면 떠오르는(눌리는 듯한) 효과
+                    "div[class*='st-key-ptbtn_'] button:hover{"
+                    "transform:translateY(-2px) scale(1.07)!important;"
+                    "box-shadow:0 4px 11px rgba(10,31,68,.42)!important;"
+                    "filter:brightness(1.08)!important;position:relative;"
+                    "z-index:5;}"
+                    "div[class*='st-key-ptbtn_'] button:active{"
+                    "transform:translateY(0) scale(0.95)!important;}"
+                    # 간격 축소 + 그리드 최대 너비 + 가운데 정렬
+                    ".st-key-ptgrid{max-width:760px!important;"
+                    "margin-left:auto!important;margin-right:auto!important;}"
+                    "div[data-testid='stHorizontalBlock']:has("
+                    "div[class*='st-key-ptbtn_']){gap:4px!important;}"
+                    ".st-key-ptgrid div[data-testid='stVerticalBlock']"
+                    "{gap:4px!important;}")
+        for _e in _PT:
+            _v = int(_elc.get(_e, 0))
+            _bg = _cell_color(_v)
+            _dark = _v > 0 and (np.log10(_v + 1) / (_maxlog or 1)) >= 0.6
+            _fg = "#ffffff" if _dark else ("#1a2b45" if _v > 0 else "#c4ccd8")
+            _btn_css += (f".st-key-ptbtn_{_e} button{{background:{_bg}!important;"
+                         f"color:{_fg}!important;border:1px solid {_bg}!important;}}")
+            if _e == _sel_el:
+                _btn_css += (f".st-key-ptbtn_{_e} button{{outline:2px solid "
+                             f"#eb6834!important;outline-offset:-1px;}}")
+        st.markdown(f"<style>{_btn_css}</style>", unsafe_allow_html=True)
+        _pos = {(r, c): e for e, (r, c) in _PT.items()}
+        with st.container(key="ptgrid"):
+            for _r in range(1, 9):
+                _rowcols = st.columns(18, gap="small")
+                for _c in range(1, 19):
+                    _e = _pos.get((_r, _c))
                     if _e:
-                        _PT[_e] = (row, sc + _i)
-            _PT["H"] = (1, 1); _PT["He"] = (1, 18)
-            _pt_add(2, ["Li", "Be"], 1)
-            _pt_add(2, ["B", "C", "N", "O", "F", "Ne"], 13)
-            _pt_add(3, ["Na", "Mg"], 1)
-            _pt_add(3, ["Al", "Si", "P", "S", "Cl", "Ar"], 13)
-            _pt_add(4, ["K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
-                        "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr"], 1)
-            _pt_add(5, ["Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd",
-                        "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe"], 1)
-            _pt_add(6, ["Cs", "Ba"], 1); _PT["La"] = (6, 3)
-            _pt_add(6, ["Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
-                        "Pb", "Bi", "Po", "At", "Rn"], 4)
-            _pt_add(7, ["Fr", "Ra"], 1); _PT["Ac"] = (7, 3)
-            _pt_add(8, ["Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho",
-                        "Er", "Tm", "Yb", "Lu"], 4)
-            _elc = pd.Series(dtype=int)
-            if FORMULA_COL:
-                from collections import Counter
-                _cnt = Counter()
-                for _f in df[FORMULA_COL].dropna().astype(str):
-                    for _e in set(_ELEMENT_RE.findall(_f)):
-                        _cnt[_e] += 1
-                _elc = pd.Series(_cnt)
-            _SCALE = ["#e6f1fb", "#b5d4f4", "#6fa8dc", "#2a6db5", "#0a2c5e"]
-            _maxlog = float(np.log10(_elc.max() + 1)) if not _elc.empty else 1.0
+                        with _rowcols[_c - 1]:
+                            st.button(_e, key=f"ptbtn_{_e}", on_click=_pick_el,
+                                      args=(_e,), use_container_width=True,
+                                      help=f"{_e}: {int(_elc.get(_e, 0)):,}개 물질")
+        if not _elc.empty:
+            _top5 = ", ".join(f"{k}({v:,})" for k, v in
+                              _elc.sort_values(ascending=False).head(5).items())
+            st.caption(f"최다: {_top5} · 색이 진할수록 자주 등장 · 클릭해 선택")
 
-            def _cell_color(v):
-                if v <= 0:
-                    return "#f4f6fa"
-                frac = np.log10(v + 1) / (_maxlog or 1)
-                return _SCALE[max(0, min(4, int(frac * 5 - 1e-9)))]
-            # 선택된 원소 (주기율표 셀 클릭 → ?el=원소 쿼리파라미터)
-            _q_el = st.query_params.get("el")
-            _sel_el = _q_el if (_q_el in _elc.index or _q_el in _PT) else (
-                "O" if "O" in _PT else next(iter(_PT)))
-            _cells = ""
-            for _e, (_r, _cc) in _PT.items():
-                _v = int(_elc.get(_e, 0))
-                _bg = _cell_color(_v)
-                _dark = _v > 0 and (np.log10(_v + 1) / (_maxlog or 1)) >= 0.6
-                _fg = "#ffffff" if _dark else ("#1a2b45" if _v > 0 else "#c4ccd8")
-                _selborder = ("outline:3px solid #eb6834; outline-offset:-1px;"
-                              if _e == _sel_el else "")
-                _cells += (
-                    f'<a class="ptcell" href="?el={_e}" target="_self" '
-                    f'title="{_e}: {_v:,}개 물질 (클릭해서 선택)" '
-                    f'style="grid-row:{_r}; grid-column:{_cc}; background:{_bg}; '
-                    f'border-radius:4px; display:flex; align-items:center; '
-                    f'justify-content:center; aspect-ratio:1; font-size:11px; '
-                    f'font-weight:600; text-decoration:none; color:{_fg}; '
-                    f'{_selborder}">{_e}</a>')
-            _grid_pt = (
-                '<div style="display:grid; grid-template-columns:repeat(18, 1fr);'
-                ' gap:2px;">' + _cells + '</div>')
-            st.markdown(_grid_pt, unsafe_allow_html=True)
-            if not _elc.empty:
-                _top5 = ", ".join(f"{k}({v:,})" for k, v in
-                                  _elc.sort_values(ascending=False).head(5).items())
-                st.caption(f"최다 등장 원소: {_top5}")
-                # 주기율표 셀을 클릭하면 그 원소가 선택됩니다.
-                _el_sel = _sel_el
-                st.markdown(
-                    f'<p style="font-size:12px; color:#5f6b7a; margin:2px 0 6px;">'
-                    f'주기율표 원소를 <b>클릭</b>하면 요약이 바뀝니다 · 현재 선택: '
-                    f'<b style="color:#eb6834;">{_el_sel}</b></p>',
-                    unsafe_allow_html=True)
-                if "_elements" in df.columns:
-                    _emask = df["_elements"].map(lambda s: _el_sel in s
-                                                 if isinstance(s, (set, frozenset))
-                                                 else False)
-                else:
-                    _emask = df[FORMULA_COL].astype(str).str.contains(
-                        _el_sel, na=False) if FORMULA_COL else pd.Series(
-                        False, index=df.index)
-                _edf = df[_emask]
-                _ecnt = len(_edf)
+        # ── 선택 원소 요약 ──────────────────────────────────────────────────
+        _section(f"선택 원소 요약 · {_sel_el}", "#1baf7a")
+        with st.container(border=True):
+            if "_elements" in df.columns:
+                _emask = df["_elements"].map(
+                    lambda s: _sel_el in s
+                    if isinstance(s, (set, frozenset)) else False)
+            else:
+                _emask = df[FORMULA_COL].astype(str).str.contains(
+                    _sel_el, na=False) if FORMULA_COL else pd.Series(
+                    False, index=df.index)
+            _edf = df[_emask]
+            _ecnt = len(_edf)
 
-                def _favg(col):
-                    if col in _edf.columns and _edf[col].notna().any():
-                        return f"{_edf[col].mean():.2f}"
-                    return "—"
-                _agap, _an, _ap = (_favg("electronic_band_gap"),
-                                   _favg("S_mu_n"), _favg("S_mu_p"))
-                st.markdown(
-                    f'<div style="background:#eef4fc; border:1px solid #cfe0f5; '
-                    f'border-radius:8px; padding:10px 12px;">'
-                    f'<div style="font-size:14px; font-weight:700; '
-                    f'color:#0a1f44; margin-bottom:6px;">{_el_sel} 포함 물질 요약</div>'
-                    f'<div style="display:flex; gap:8px; flex-wrap:wrap; '
-                    f'font-size:12px; color:#1a2b45;">'
-                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
-                    f'border-radius:6px; padding:4px 8px;">물질 수 '
-                    f'<b>{_ecnt:,}</b></span>'
-                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
-                    f'border-radius:6px; padding:4px 8px;">평균 밴드갭 '
-                    f'<b>{_agap}</b> eV</span>'
-                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
-                    f'border-radius:6px; padding:4px 8px;">평균 S_mu_n '
-                    f'<b>{_an}</b></span>'
-                    f'<span style="background:#fff; border:1px solid #dbe6f5; '
-                    f'border-radius:6px; padding:4px 8px;">평균 S_mu_p '
-                    f'<b>{_ap}</b></span></div></div>',
-                    unsafe_allow_html=True)
-                # mobility 상위 물질 Top 5
-                if _ecnt and {"S_mu_n", "S_mu_p"} <= set(_edf.columns):
-                    _mm = _edf[["S_mu_n", "S_mu_p"]].max(axis=1)
-                    _topd = _edf.assign(_m=_mm).dropna(subset=["_m"]).nlargest(5, "_m")
-                    if not _topd.empty:
-                        _cols = [c for c in ["material_id", "source", FORMULA_COL,
-                                             "electronic_band_gap",
-                                             "S_mu_n", "S_mu_p"]
-                                 if c and c in _topd.columns]
-                        st.caption(f"{_el_sel} 포함 · mobility 상위 물질")
-                        st.dataframe(_topd[_cols].reset_index(drop=True),
-                                     use_container_width=True, height=150)
+            def _favg(col):
+                if col in _edf.columns and _edf[col].notna().any():
+                    return f"{_edf[col].mean():.2f}"
+                return "—"
+            _agap, _an, _ap = (_favg("electronic_band_gap"),
+                               _favg("S_mu_n"), _favg("S_mu_p"))
+            st.markdown(
+                f'<div style="display:flex; gap:8px; flex-wrap:wrap; '
+                f'font-size:12px; color:#1a2b45;">'
+                f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                f'border-radius:6px; padding:4px 8px;">물질 수 '
+                f'<b>{_ecnt:,}</b></span>'
+                f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                f'border-radius:6px; padding:4px 8px;">평균 밴드갭 '
+                f'<b>{_agap}</b> eV</span>'
+                f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                f'border-radius:6px; padding:4px 8px;">평균 S_mu_n '
+                f'<b>{_an}</b></span>'
+                f'<span style="background:#fff; border:1px solid #dbe6f5; '
+                f'border-radius:6px; padding:4px 8px;">평균 S_mu_p '
+                f'<b>{_ap}</b></span></div>',
+                unsafe_allow_html=True)
+            if _ecnt and {"S_mu_n", "S_mu_p"} <= set(_edf.columns):
+                _mm = _edf[["S_mu_n", "S_mu_p"]].max(axis=1)
+                _topd = _edf.assign(_m=_mm).dropna(subset=["_m"]).nlargest(5, "_m")
+                if not _topd.empty:
+                    _cols = [c for c in ["material_id", "source", FORMULA_COL,
+                                         "electronic_band_gap", "S_mu_n", "S_mu_p"]
+                             if c and c in _topd.columns]
+                    st.caption(f"{_sel_el} 포함 · mobility 상위 물질")
+                    st.dataframe(_topd[_cols].reset_index(drop=True),
+                                 use_container_width=True, height=150)
 
     st.markdown("---")
 
