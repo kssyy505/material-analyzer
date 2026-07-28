@@ -645,8 +645,7 @@ def predict_mobility_row(base_vals):
 
     def _pr(b):
         _feat = b["meta"]["feat_cols"]
-        _med = b["meta"]["medians"]
-        _X = pd.DataFrame([[full.get(c, _med.get(c)) for c in _feat]],
+        _X = pd.DataFrame([[full.get(c, np.nan) for c in _feat]],
                           columns=_feat)
         mu = float(np.expm1(b["model"].predict(_X)[0]))
         g = np.asarray(b["meta"]["pct_grid"])
@@ -2200,7 +2199,8 @@ with tab6:
             # 두 모델 feature의 합집합을 받아 어느 쪽도 결측이 없도록 한다.
             feat_cols = list(dict.fromkeys(
                 bundle_n["meta"]["feat_cols"] + bundle_p["meta"]["feat_cols"]))
-            base_feats = [c for c in feat_cols if c not in _DERIVED]
+            base_feats = [c for c in feat_cols
+                          if c not in _DERIVED and c != "is_metal"]
             # 중앙값도 두 모델 것을 병합 (예측 시 결측 대치용)
             medians = {**bundle_p["meta"]["medians"], **bundle_n["meta"]["medians"]}
 
@@ -2226,6 +2226,7 @@ with tab6:
                 horizontal=True, label_visibility="collapsed")
             template = dict(medians)
             tmpl_name = "데이터 중앙값"
+            _missing = set()   # 이 물질에 값이 없는 물성 → 입력칸을 빈칸으로
 
             if use_template == "기존 물질 불러오기" and HAS["material_id"]:
                 _ids = df["material_id"].dropna().unique().tolist()
@@ -2240,6 +2241,8 @@ with tab6:
                     for c in base_feats:
                         if c in _row.columns and pd.notna(_row.iloc[0][c]):
                             template[c] = float(_row.iloc[0][c])
+                        else:
+                            _missing.add(c)   # 값 없음 → 빈칸 처리
 
             elif use_template == "파일 업로드 (CSV/Excel)":
                 _up = st.file_uploader(
@@ -2276,6 +2279,8 @@ with tab6:
                         for c in base_feats:
                             if c in _udf.columns and pd.notna(_urow[c]):
                                 template[c] = float(_urow[c])
+                            else:
+                                _missing.add(c)
                         if not _matched:
                             st.warning("매칭된 물성 컬럼이 없습니다. 컬럼명이 "
                                        "데이터셋 변수명과 같은지 확인하세요 "
@@ -2285,34 +2290,34 @@ with tab6:
                 else:
                     st.info("파일을 올리기 전에는 중앙값이 시작값으로 사용됩니다.")
 
-            # ── 템플릿이 바뀌면 입력 위젯 값을 새 템플릿으로 갱신 ──────────────
-            # (Streamlit 위젯은 key가 있으면 최초 값만 반영하므로, 템플릿 변경 시
-            #  session_state를 직접 덮어써야 입력칸이 실제로 바뀐다)
             def _clean(v):
                 return 0.0 if v is None or pd.isna(v) else float(v)
 
+            # 템플릿(물질)이 바뀌면 위젯 key도 바뀌어 새 시작값으로 재초기화된다.
+            # (값이 없는 물성은 value=None → 입력칸이 빈칸으로 표시됨)
             _sig = ("median" if use_template == "데이터 중앙값" else tmpl_name)
-            if st.session_state.get("_pred_sig") != _sig:
-                st.session_state["_pred_sig"] = _sig
-                for c in base_feats:
-                    v = _clean(template.get(c))
-                    st.session_state[f"pred_{c}"] = (bool(round(v))
-                                                     if c in _BINARY_FEATS else v)
+            _sig_h = str(abs(hash(_sig)) % 1_000_000)
 
-            # 입력 폼 — 위젯은 session_state(key)로만 구동 (value= 미지정)
             st.markdown("##### 2) 물성 입력 (필요한 값만 수정)")
             st.caption(f"현재 시작값: **{tmpl_name}** "
                        "— 물질을 바꾸면 아래 값이 자동으로 갱신됩니다.")
+            if _missing:
+                st.caption(f"※ 이 물질에 값이 없는 물성 {len(_missing)}개는 "
+                           "**빈칸**으로 표시됩니다. 비워두면 예측 시 중앙값 대체 "
+                           "없이 **NaN(결측)** 으로 모델에 전달됩니다.")
             inputs = {}
 
             def _num_input(col, label=None):
-                k = f"pred_{col}"
-                if k not in st.session_state:
-                    st.session_state[k] = (False if col in _BINARY_FEATS
-                                           else _clean(template.get(col)))
+                k = f"pred_{col}_{_sig_h}"
                 if col in _BINARY_FEATS:
-                    return 1.0 if st.checkbox(label or col, key=k) else 0.0
-                return float(st.number_input(label or col, format="%.4f", key=k))
+                    _dv = (False if col in _missing
+                           else bool(round(_clean(template.get(col)))))
+                    return 1.0 if st.checkbox(label or col, value=_dv,
+                                              key=k) else 0.0
+                _dv = None if col in _missing else _clean(template.get(col))
+                v = st.number_input(label or col, value=_dv, format="%.4f",
+                                    key=k, placeholder="값 없음")
+                return v  # 빈칸이면 None
 
             _key_present = [c for c in _KEY_FEATS if c in base_feats]
             cols = st.columns(3)
@@ -2327,9 +2332,12 @@ with tab6:
                     with rcols[i % 3]:
                         inputs[c] = _num_input(c)
 
-            # 입력값으로 채우고 파생 feature 계산 (예측에 실제 입력값 사용)
+            # 값 없는 물성은 중앙값으로 대체하지 않고 NaN으로 둔다
+            # (HistGradientBoosting은 NaN을 그대로 처리함).
             full = dict(template)
-            full.update(inputs)
+            for _c in _missing:
+                full[_c] = np.nan
+            full.update({_k: _v for _k, _v in inputs.items() if _v is not None})
             full = _add_derived_row(full)
 
             st.markdown("##### 3) 예측")
@@ -2337,11 +2345,10 @@ with tab6:
                          type="primary", use_container_width=True):
                 def _predict(bundle):
                     # 각 모델은 CROSS_EXCLUDE로 feature 집합이 다르므로
-                    # 자기 feature 순서대로 입력 행을 만든다.
+                    # 자기 feature 순서대로 입력 행을 만든다. 없는 값은 NaN.
                     _fc = bundle["meta"]["feat_cols"]
-                    _med = bundle["meta"]["medians"]
                     _Xrow = pd.DataFrame(
-                        [[full.get(c, _med.get(c)) for c in _fc]], columns=_fc)
+                        [[full.get(c, np.nan) for c in _fc]], columns=_fc)
                     mu = float(np.expm1(bundle["model"].predict(_Xrow)[0]))
                     grid = np.asarray(bundle["meta"]["pct_grid"])
                     pctile = int(np.clip(np.searchsorted(grid, mu), 0, 100))
