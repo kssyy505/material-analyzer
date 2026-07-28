@@ -655,6 +655,29 @@ def predict_mobility_row(base_vals):
     return mn, pn, mp_, pp
 
 
+_M3D_MOBILITY_FILES = ("m3d_mobility.csv.gz", "m3d_mobility.csv",
+                       "m3d_mobility.xlsx")
+
+
+@st.cache_data(show_spinner=False)
+def _m3d_predicted_scores():
+    """M3D Hub 물질의 mobility(S_mu_n·S_mu_p)를 미리 계산해 둔 파일에서 불러온다.
+    (앱에서 직접 학습·예측하지 않음.) 파일이 없으면 빈 DataFrame.
+    파일 형식: 컬럼 material_id, S_mu_n, S_mu_p."""
+    _cols = ["material_id", "S_mu_n", "S_mu_p"]
+    for f in _M3D_MOBILITY_FILES:
+        if os.path.exists(f):
+            try:
+                d = (pd.read_excel(f) if f.lower().endswith(("xlsx", "xls"))
+                     else pd.read_csv(f))
+                d.columns = [str(c).strip() for c in d.columns]
+                if set(_cols) <= set(d.columns):
+                    return d[_cols].copy()
+            except Exception:
+                continue
+    return pd.DataFrame(columns=_cols)
+
+
 def recommend_apps(gap, direct, pn, pp):
     """활용 분야 추천 규칙 → [(분야, 적합도0~100, 근거, 스펙)] 정렬 리스트."""
     if gap is None or pd.isna(gap):
@@ -718,9 +741,9 @@ if "view" not in st.session_state:
     st.session_state.view = "overview"
 
 if st.session_state.view == "overview":
-    st.subheader("반도체·신소재 데이터 분석 플랫폼 소개")
+    st.subheader("반도체·신소재 데이터 분석 플랫폼")
     st.write(
-        "Materials Project 기반 소재 데이터셋 중 **비금속(반도체·절연체) 물질만** "
+        "Materials Project 기반 소재 데이터셋 중 **반도체 물질만** "
         "대상으로 탐색·스크리닝하는 대시보드입니다. "
         "분석 화면에서는 결정계·밴드갭·화학 조성 필터, 전자 구조 분석, "
         "물성 스크리닝, 상관관계 히트맵, DOS 상세 분석 기능을 사용할 수 있으며, "
@@ -824,16 +847,12 @@ if st.session_state.view == "overview":
     _stable = (f"{int((df['is_stable'] == True).sum()):,}"
                if HAS["is_stable"] else "—")
 
-    # 그래프를 제외한 데이터 카드는 모두 왼쪽, 구성 원소 분포는 오른쪽
+    # 데이터 카드 (서브텍스트 없이, 일렬 배치)
     _card_specs = [
-        ("M3D Hub 물질", f"{_n_m3d_kept:,}", "atom", "DKU·KIST 계산 DB", "#0e7490"),
-        ("mobility 점수 · n형", f"{_mp_n:,}", "chart", "S_mu_n (MP)", "#7f77dd"),
-        ("mobility 점수 · p형", f"{_mp_p:,}", "chart", "S_mu_p (MP)", "#9aa5b1"),
-        ("M3D n형 (electron)", f"{_m3d_n:,}", "chart", "mobility type", "#2a78d6"),
-        ("M3D p형 (hole)", f"{_m3d_p:,}", "chart", "mobility type", "#eb6834"),
-        ("M3D 실험 증명 (doped)", f"{_m3d_doped:,}", "shield",
-         "doped system = Yes", "#1baf7a"),
-        ("M3D 미증명", f"{_m3d_undoped:,}", "shield", "doped 아님", "#9aa5b1"),
+        ("자체 수집DB · n형", f"{_mp_n:,}", "chart", "", "#7f77dd"),
+        ("자체 수집DB · p형", f"{_mp_p:,}", "chart", "", "#9aa5b1"),
+        ("M3D n형 (electron)", f"{_m3d_n:,}", "chart", "", "#2a78d6"),
+        ("M3D p형 (hole)", f"{_m3d_p:,}", "chart", "", "#eb6834"),
         ("물성 변수 수", f"{df.shape[1]:,}", "columns", "", "#0e7490"),
     ]
 
@@ -882,39 +901,15 @@ if st.session_state.view == "overview":
         st.session_state["ov_sel_el"] = "O" if "O" in _PT else next(iter(_PT), "O")
     _sel_el = st.session_state["ov_sel_el"]
 
-    _ovL, _ovR = st.columns([1, 1.05])
+    # 세로 스택: 데이터 카드(위) → 주기율표(아래) 순서로 배치
+    _ovL = st.container()
+    _ovR = st.container()
     with _ovL:
         _grid = "".join(_dcard(l, v, ic, s, c)
                         for (l, v, ic, s, c) in _card_specs)
         st.markdown(
-            '<div style="display:grid; grid-template-columns:1fr 1fr; '
-            f'gap:8px;">{_grid}</div>', unsafe_allow_html=True)
-
-        # 주요 물성 데이터 보유율 — 한 줄 정리
-        _cov_items = [
-            ("밴드갭", "electronic_band_gap", "#2a78d6"),
-            ("밴드 에지(CBM/VBM)", "cbm", "#2a78d6"),
-            ("열전(PF)", "PF_n", "#1baf7a"),
-            ("S_mu_n", "S_mu_n", "#7f77dd"),
-            ("S_mu_p", "S_mu_p", "#9aa5b1"),
-        ]
-        _chips = ""
-        for _lab, _col, _clr in _cov_items:
-            if _col not in df.columns:
-                continue
-            _cntv = int(df[_col].notna().sum())
-            _chips += (
-                f'<div style="flex:1; min-width:82px; background:#ffffff; '
-                f'border:1px solid #e4e9f2; border-radius:8px; padding:6px 8px;">'
-                f'<div style="font-size:10px; color:#5f6b7a;">{_lab}</div>'
-                f'<div style="font-size:15px; font-weight:700; color:{_clr};">'
-                f'{_cntv:,}<span style="font-size:9px; color:#8a97a8; '
-                f'font-weight:400;">개</span></div></div>')
-        st.markdown(
-            '<p style="font-size:11px; color:#52514e; margin:10px 0 4px;">'
-            '주요 물성 데이터 보유 물질 수 (coverage)</p>'
-            f'<div style="display:flex; gap:6px; flex-wrap:wrap;">{_chips}</div>',
-            unsafe_allow_html=True)
+            '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
+            f'{_grid}</div>', unsafe_allow_html=True)
 
     with _ovR:
         # ── 구성 원소 분포 (주기율표) — 원소 버튼 클릭으로 선택 (새로고침 없음) ──
@@ -1565,10 +1560,10 @@ def fetch_fatband_from_mp(material_id, api_key, mode="element"):
 
 # 상위 탭: 데이터 탐색 · DOS 상세 분석 · Mobility 예측 · 기타
 # '기타' 안에 전자 구조 분석 · 물성 스크리닝 · 상관관계 히트맵 · 관심목록을 배치
-tab1, tab5, tab6, _tab_etc = st.tabs([
+tab1, tab6, tab5, _tab_etc = st.tabs([
     ":material/table_chart: 데이터 탐색",
-    ":material/query_stats: DOS 상세 분석",
     ":material/neurology: Mobility 예측",
+    ":material/query_stats: DOS 상세 분석",
     ":material/apps: 기타",
 ])
 with _tab_etc:
@@ -1590,6 +1585,24 @@ with tab1:
         if _mc in filtered_df.columns:
             show_cols.append(_mc)
     display_df = filtered_df.drop(columns=["_elements"], errors="ignore")
+
+    # M3D Hub 물질은 dDOS0.1 모델로 예측한 mobility score를 채워 표시한다.
+    if "source" in display_df.columns and \
+            (display_df["source"] == "M3D Hub").any():
+        try:
+            _m3dp = _m3d_predicted_scores()
+            if not _m3dp.empty:
+                _pmap_n = dict(zip(_m3dp["material_id"], _m3dp["S_mu_n"]))
+                _pmap_p = dict(zip(_m3dp["material_id"], _m3dp["S_mu_p"]))
+                _ism = display_df["source"] == "M3D Hub"
+                for _c, _pm in [("S_mu_n", _pmap_n), ("S_mu_p", _pmap_p)]:
+                    if _c in display_df.columns:
+                        display_df.loc[_ism, _c] = display_df.loc[
+                            _ism, "material_id"].map(_pm)
+                st.caption("※ M3D Hub 물질의 S_mu_n·S_mu_p는 미리 계산해 둔 "
+                           "결과 파일(m3d_mobility)에서 불러온 값입니다.")
+        except Exception as _e:
+            st.caption(f"M3D 예측 생략: {_e}")
 
     # 항상 선택한 캐리어의 mobility 점수 랭킹(내림차순) 순으로 정렬
     _sort_cols = [c for c in MOB_SCORE_COLS if c in display_df.columns]
