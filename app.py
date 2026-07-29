@@ -754,7 +754,7 @@ if st.session_state.view == "overview":
     _intro_b1, _intro_b2 = st.columns([1, 2.4])
     with _intro_b1:
         if st.button("데이터 분석 시작하기", icon=":material/analytics:",
-                     type="primary", use_container_width=True,
+                     type="primary", width='stretch',
                      key="start_top"):
             st.session_state.view = "analysis"
             st.rerun()
@@ -960,7 +960,7 @@ if st.session_state.view == "overview":
                     if _e:
                         with _rowcols[_c - 1]:
                             st.button(_e, key=f"ptbtn_{_e}", on_click=_pick_el,
-                                      args=(_e,), use_container_width=True,
+                                      args=(_e,), width='stretch',
                                       help=f"{_e}: {int(_elc.get(_e, 0)):,}개 물질")
         if not _elc.empty:
             _top5 = ", ".join(f"{k}({v:,})" for k, v in
@@ -1012,7 +1012,7 @@ if st.session_state.view == "overview":
                              if c and c in _topd.columns]
                     st.caption(f"{_sel_el} 포함 · mobility 상위 물질")
                     st.dataframe(_topd[_cols].reset_index(drop=True),
-                                 use_container_width=True, height=150)
+                                 width='stretch', height=150)
 
     st.markdown("---")
 
@@ -1042,7 +1042,7 @@ if st.session_state.view == "overview":
                               marker_line_width=0)
             fig.update_layout(showlegend=False, coloraxis_showscale=False,
                               xaxis_title=None, yaxis_title=None)
-            st.plotly_chart(_flat(fig, h=300), use_container_width=True,
+            st.plotly_chart(_flat(fig, h=300), width='stretch',
                             config=_NO_BAR)
     with c2, st.container(border=True):
         if "space_group_symbol" in _sdf.columns:
@@ -1055,7 +1055,7 @@ if st.session_state.view == "overview":
             fig.update_traces(marker_line_width=0)
             fig.update_layout(showlegend=False, coloraxis_showscale=False,
                               xaxis_title=None, yaxis_title=None)
-            st.plotly_chart(_flat(fig, h=300), use_container_width=True,
+            st.plotly_chart(_flat(fig, h=300), width='stretch',
                             config=_NO_BAR)
 
     # ── 밴드갭 분포 (n형 / p형 분리, 전체 / mobility 상위 10% 선택) ──────────
@@ -1082,7 +1082,7 @@ if st.session_state.view == "overview":
                                    labels={"electronic_band_gap": "밴드갭 (eV)"})
                 fig.update_layout(yaxis_title="물질 수", bargap=0.12,
                                   showlegend=False)
-                st.plotly_chart(_flat(fig, h=300), use_container_width=True,
+                st.plotly_chart(_flat(fig, h=300), width='stretch',
                                 config=_NO_BAR)
                 st.caption(f"{_mcol} 보유 물질 {len(_sub):,}개 기준 ({_bg_scope})")
 
@@ -1113,7 +1113,7 @@ if st.session_state.view == "overview":
                    "AI feature 중요도를 표시합니다 (배포 환경 안정성을 위해 "
                    "부팅 시 자동 실행하지 않습니다).")
         if st.button("모델 성능·AI feature 중요도 계산",
-                     icon=":material/insights:", use_container_width=True):
+                     icon=":material/insights:", width='stretch'):
             try:
                 _mb = get_mobility_models()
                 _bn, _bp = _mb.get("n-type"), _mb.get("p-type")
@@ -1154,7 +1154,7 @@ if st.session_state.view == "overview":
                                 _fig2 = _flat(_fig, h=300)
                                 _fig2.update_layout(margin=dict(t=8, b=8,
                                                                 l=8, r=8))
-                                st.plotly_chart(_fig2, use_container_width=True,
+                                st.plotly_chart(_fig2, width='stretch',
                                                 config=_NO_BAR)
                     st.caption("중요도는 permutation importance(테스트셋에서 각 "
                                "feature를 무작위로 섞을 때 R² 감소량) 기준입니다. "
@@ -1168,7 +1168,7 @@ if st.session_state.view == "overview":
     st.stop()  # 개요 페이지에서는 아래 분석 UI를 렌더링하지 않음
 
 # ── 분석 페이지: 사이드바 상단에 개요 복귀 버튼 ──────────────────────────────
-if st.sidebar.button("← 개요로 돌아가기", use_container_width=True):
+if st.sidebar.button("← 개요로 돌아가기", width='stretch'):
     st.session_state.view = "overview"
     st.rerun()
 
@@ -1623,7 +1623,7 @@ with tab1:
         default=_defaults or _all_cols[:6],
         help="원하는 컬럼을 추가/제거하면 테이블과 CSV 다운로드에 반영됩니다.")
     _view = display_df[sel_view_cols] if sel_view_cols else display_df
-    st.dataframe(_view, use_container_width=True, height=420)
+    st.dataframe(_view, width='stretch', height=420)
 
     st.download_button(
         "필터링 결과 CSV 다운로드 (선택한 컬럼)", icon=":material/download:",
@@ -1646,7 +1646,7 @@ with tab1:
         with _ac2:
             st.write("")
             st.write("")
-            if st.button("담기", use_container_width=True,
+            if st.button("담기", width='stretch',
                          disabled=not _pick):
                 _n = _add_to_cart(_pick)
                 st.success(f"{_n}개 담김 (총 {len(st.session_state.cart)}개)")
@@ -1820,14 +1820,14 @@ with tab3:
                     fig.update_yaxes(range=[min(_ymin, 0), 2e6])
                     st.caption("※ y축을 2,000,000까지로 제한했습니다 "
                                "(초과 물질은 화면 밖).")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 st.caption(f"파레토 최적 {len(_front):,}개 (전체 "
                            f"{len(_pdf):,}개 중). 빨간 점이 두 목표를 동시에 "
                            "만족하는 최적 후보입니다.")
                 _show = [c for c in ["material_id", FORMULA_COL, obj1, obj2]
                          if c and c in _front.columns]
                 st.dataframe(_front[_show].reset_index(drop=True),
-                             use_container_width=True, height=240)
+                             width='stretch', height=240)
                 if HAS["material_id"] and st.button(
                         "파레토 후보 관심목록에 담기",
                         icon=":material/bookmark_add:", key="par_cart"):
@@ -1864,7 +1864,7 @@ with tab3:
                 if _pf is None:
                     st.warning("해당 화학계의 데이터를 찾지 못했습니다.")
                 else:
-                    st.plotly_chart(_pf, use_container_width=True)
+                    st.plotly_chart(_pf, width='stretch')
                     st.caption(f"{'-'.join(_els)} 계 · 전체 {_ntot}개 중 "
                                f"안정상 {_nstab}개 (껍질 위). 준안정상은 "
                                "껍질로부터의 거리로 표시됩니다.")
@@ -1896,7 +1896,7 @@ with tab4:
                           margin=dict(l=10, r=10, t=50, b=10))
         _lc, _cc, _rc = st.columns([1, 6, 1])
         with _cc:
-            st.plotly_chart(fig, use_container_width=False)
+            st.plotly_chart(fig, width='content')
     else:
         st.info("2개 이상의 변수를 선택하세요.")
 
@@ -2052,7 +2052,7 @@ with tab5:
             st.write("")
             st.write("")
             if st.button("키 저장", icon=":material/save:",
-                         disabled=not _key_in, use_container_width=True):
+                         disabled=not _key_in, width='stretch'):
                 os.makedirs(".streamlit", exist_ok=True)
                 _sf = os.path.join(".streamlit", "secrets.toml")
                 _lines = []
@@ -2355,7 +2355,7 @@ with tab6:
 
             st.markdown("##### 3) 예측")
             if st.button("Mobility 예측 실행", icon=":material/play_circle:",
-                         type="primary", use_container_width=True):
+                         type="primary", width='stretch'):
                 def _predict(bundle):
                     # 각 모델은 CROSS_EXCLUDE로 feature 집합이 다르므로
                     # 자기 feature 순서대로 입력 행을 만든다. 없는 값은 NaN.
@@ -2961,7 +2961,7 @@ with tab7:
             st.session_state["last_rank"] = _rank_view
             st.caption(f"조건 만족 물질 {len(_rank_full):,}개 중 "
                        f"{len(_rank_view):,}개 표시")
-            st.dataframe(_rank_view, use_container_width=True, height=420)
+            st.dataframe(_rank_view, width='stretch', height=420)
 
     if "last_rank" in st.session_state:
         _rv = st.session_state["last_rank"]
@@ -2975,7 +2975,7 @@ with tab7:
         with _rc2:
             st.write("")
             if st.button("상위 N개 담기", icon=":material/bookmark_add:",
-                         use_container_width=True):
+                         width='stretch'):
                 _n = _add_to_cart(_rv["material_id"].head(int(_topn)).tolist()
                                   if _has_id else [])
                 st.success(f"{_n}개 담김 (총 {len(st.session_state.cart)}개)")
@@ -3025,19 +3025,19 @@ with tab7:
                                 key="cart_extra")
         cart_show = cart_df[_cmp_cols + _extra].drop(
             columns=["_elements"], errors="ignore").reset_index(drop=True)
-        st.dataframe(cart_show, use_container_width=True)
+        st.dataframe(cart_show, width='stretch')
 
         rc1, rc2, rc3 = st.columns(3)
         with rc1:
             _rm = st.selectbox("제거할 물질", ["(선택)"] +
                                st.session_state.cart, key="cart_rm")
-            if st.button("선택 제거", use_container_width=True,
+            if st.button("선택 제거", width='stretch',
                          disabled=_rm == "(선택)"):
                 st.session_state.cart.remove(_rm)
                 st.rerun()
         with rc2:
             if st.button("전체 비우기", icon=":material/delete:",
-                         use_container_width=True):
+                         width='stretch'):
                 st.session_state.cart = []
                 st.rerun()
         with rc3:
@@ -3046,7 +3046,7 @@ with tab7:
                 data=_to_excel_bytes({"관심목록": cart_show}),
                 file_name="watchlist.xlsx",
                 mime="application/vnd.openxmlformats-officedocument."
-                     "spreadsheetml.sheet", use_container_width=True)
+                     "spreadsheetml.sheet", width='stretch')
 
         # 종합 리포트 (HTML) — 관심목록 + (있으면) 랭킹
         _tables = {"관심목록 비교": cart_show}
