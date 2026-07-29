@@ -656,25 +656,39 @@ def predict_mobility_row(base_vals):
 
 
 _M3D_MOBILITY_FILES = ("m3d_mobility.csv.gz", "m3d_mobility.csv",
-                       "m3d_mobility.xlsx")
+                       "m3d_mobility.xlsx", "m3d_mobility_app.csv.gz",
+                       "m3d_mobility_app.csv", "m3d_mobility_app.xlsx")
 
 
 @st.cache_data(show_spinner=False)
 def _m3d_predicted_scores():
     """M3D Hub 물질의 mobility(S_mu_n·S_mu_p)를 미리 계산해 둔 파일에서 불러온다.
     (앱에서 직접 학습·예측하지 않음.) 파일이 없으면 빈 DataFrame.
-    파일 형식: 컬럼 material_id, S_mu_n, S_mu_p."""
+    지원 형식 ① material_id, S_mu_n, S_mu_p
+             ② material_id, type(n/p), s_mu  → 타입별로 S_mu_n/S_mu_p에 분배."""
     _cols = ["material_id", "S_mu_n", "S_mu_p"]
     for f in _M3D_MOBILITY_FILES:
-        if os.path.exists(f):
-            try:
-                d = (pd.read_excel(f) if f.lower().endswith(("xlsx", "xls"))
-                     else pd.read_csv(f))
-                d.columns = [str(c).strip() for c in d.columns]
-                if set(_cols) <= set(d.columns):
-                    return d[_cols].copy()
-            except Exception:
-                continue
+        if not os.path.exists(f):
+            continue
+        try:
+            d = (pd.read_excel(f) if f.lower().endswith(("xlsx", "xls"))
+                 else pd.read_csv(f))
+            d.columns = [str(c).strip() for c in d.columns]
+            # 형식 ①
+            if {"material_id", "S_mu_n", "S_mu_p"} <= set(d.columns):
+                return d[_cols].copy()
+            # 형식 ②: s_mu + type → 타입별 분배
+            if {"material_id", "s_mu", "type"} <= set(d.columns):
+                _t = d["type"].astype(str).str.strip().str.lower()
+                return pd.DataFrame({
+                    "material_id": d["material_id"].values,
+                    "S_mu_n": np.where(_t.str.startswith("n"),
+                                       d["s_mu"], np.nan),
+                    "S_mu_p": np.where(_t.str.startswith("p"),
+                                       d["s_mu"], np.nan),
+                })
+        except Exception:
+            continue
     return pd.DataFrame(columns=_cols)
 
 
