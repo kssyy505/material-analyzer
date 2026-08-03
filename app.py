@@ -447,6 +447,8 @@ _NON_FEATURE = {
     "material_id", "formula", "formula_file1", "formula_file2", "task", "task_id",
     "atomic_positions", "functional", "crystal_system", "space_group_symbol",
     "point_group", "magnetic_ordering", "S_mu_n", "S_mu_p",
+    # v3.2: 게이트/외삽 플래그는 feature가 아님
+    "gate_A_reliable", "gate_B_screen", "extrapolation_flag",
     "S_p", "S_n", "PF_p", "PF_n", "kappa_p", "kappa_n", "sigma_p", "sigma_n",
     "Nc_300K_cm-3", "Nv_300K_cm-3", "n_300K_cm-3", "p_300K_cm-3",
     "experimentally_observed", "total_magnetization",
@@ -482,21 +484,39 @@ def _add_derived_row(vals: dict) -> dict:
     return out
 
 
-R2_SOURCE = "앱 라이브 계산 · dDOS0.1 모델 재현 · 5-fold CV"
+R2_SOURCE = "앱 라이브 계산 · V.1.3(p형 v3.2) 모델 재현 · 5-fold CV"
 
-# 반대 캐리어(교차 채널) feature 제외 — 노트북 dDOS0.1 방법론.
-# n형 예측엔 정공계(m_p*, vbm, EF_minus_VBM, log_m_p)가, p형 예측엔
-# 전자계(m_n*, cbm, CBM_minus_EF, log_m_n)가 물리적으로 무관하므로 제외한다.
+# 반대 캐리어(교차 채널) feature 제외 — 노트북 방법론.
+# n형 예측엔 정공계가, p형 예측엔 전자계가 물리적으로 무관하므로 제외한다.
 _CROSS_EXCLUDE = {
     "S_mu_n": {"m_p_epsilon1", "m_p_epsilon2", "m_p_epsilon3", "m_p_epsilon|avg",
-               "log_m_p", "EF_minus_VBM", "vbm"},
+               "log_m_p", "EF_minus_VBM", "vbm",
+               "m_p_warp_ratio", "m_p_warp_logvar"},
     "S_mu_p": {"m_n_epsilon1", "m_n_epsilon2", "m_n_epsilon3", "m_n_epsilon|avg",
-               "log_m_n", "CBM_minus_EF", "cbm"},
+               "log_m_n", "CBM_minus_EF", "cbm",
+               "m_n_warp_ratio", "m_n_warp_logvar"},
 }
 
-# 노트북과 동일한 전용 학습 데이터(있으면 우선 사용). feature 파일은
-# merged_materials_Fermi_carriers_300K, 정답은 mobility_score_*.
+# p형 v3.2 누설 차단(surrogate): S_mu_p(v3)=f(m_p_epsilon, formation_energy)이므로
+# 이 컬럼들을 feature에서 제외해야 물리 공식 누설을 막을 수 있다.
+_P_LEAK_COLS = {"m_p_epsilon1", "m_p_epsilon2", "m_p_epsilon3", "m_p_epsilon|avg",
+                "log_m_p", "formation_energy_per_atom"}
+
+# 채널별 학습 설정 (노트북 V.1.3)
+#  n형: log(1+μ) 타깃, 게이트 없음
+#  p형(v3.2): 타깃이 이미 log10 스케일 → log 미적용, gate_B_screen 통과 +
+#             외삽 제외 + surrogate 누설 차단
+_CHANNEL_CFG = {
+    "n-type": dict(target="S_mu_n", log_target=True, use_gate=False,
+                   drop_extrap=False, extra_exclude=set()),
+    "p-type": dict(target="S_mu_p", log_target=False, use_gate=True,
+                   drop_extrap=True, extra_exclude=_P_LEAK_COLS),
+}
+
+# 전용 학습 데이터. feature 파일은 features_v2(warp 포함), 정답은 mobility_score_*.
+# p형 정답 파일에는 S_mu_p 외에 게이트 컬럼(gate_B_screen·extrapolation_flag)도 포함.
 _MOB_FEATURE_FILES = ("mobility_features.csv.gz",
+                      "merged_materials_Fermi_carriers_300K_features_v2.xlsx",
                       "merged_materials_Fermi_carriers_300K.xlsx")
 _MOB_SCORE_FILES = {
     "n-type": ("mobility_score_ntype.csv.gz", "mobility_score_ntype.xlsx"),
@@ -506,8 +526,9 @@ _MOB_SCORE_FILES = {
 
 @st.cache_data(show_spinner=False)
 def _load_mobility_training():
-    """노트북과 동일한 mobility 전용 데이터 로드 → 파생 feature 추가.
-    반환: (X_df with 파생, {채널: y_df}) 또는 전용 파일이 없으면 (None, None)."""
+    """mobility 전용 데이터 로드 → 파생 feature 추가.
+    반환: (X_df with 파생, {채널: y_df}) 또는 전용 파일이 없으면 (None, None).
+    p형 y_df는 게이트 컬럼도 함께 담는다."""
     fpath = next((f for f in _MOB_FEATURE_FILES if os.path.exists(f)), None)
     if fpath is None:
         return None, None
@@ -515,6 +536,7 @@ def _load_mobility_training():
         else pd.read_csv(fpath)
     Xd.columns = [str(c).strip() for c in Xd.columns]
     Xd = _add_derived_cols(Xd)                       # EF_minus_VBM 등 4종
+    _gate_cols = ["gate_B_screen", "extrapolation_flag"]
     ys = {}
     for ch, (tgt, cands) in [("n-type", ("S_mu_n", _MOB_SCORE_FILES["n-type"])),
                              ("p-type", ("S_mu_p", _MOB_SCORE_FILES["p-type"]))]:
@@ -525,7 +547,9 @@ def _load_mobility_training():
             else pd.read_csv(sp)
         yd.columns = [str(c).strip() for c in yd.columns]
         if tgt in yd.columns:
-            ys[ch] = yd[["material_id", tgt]]
+            _keep = ["material_id", tgt] + [g for g in _gate_cols
+                                            if g in yd.columns]
+            ys[ch] = yd[_keep]
     return Xd, ys
 
 
@@ -540,37 +564,38 @@ def get_mobility_models():
     from sklearn.model_selection import cross_val_score, KFold, train_test_split
     from sklearn.metrics import r2_score
 
-    def _winsorize(s):
-        q1, q3 = s.quantile(0.25), s.quantile(0.75)
-        return s.clip(q1 - 1.5 * (q3 - q1), q3 + 1.5 * (q3 - q1))
-
     Xd, ys = _load_mobility_training()
     _dedicated = Xd is not None and bool(ys)
     if not _dedicated:                               # 폴백: 메인 데이터셋
         Xd = _add_derived_cols(df)
-        ys = {ch: Xd[["material_id", t]]
-              for ch, t in [("n-type", "S_mu_n"), ("p-type", "S_mu_p")]
-              if t in Xd.columns}
+        ys = {ch: Xd[["material_id", _CHANNEL_CFG[ch]["target"]]]
+              for ch in ("n-type", "p-type")
+              if _CHANNEL_CFG[ch]["target"] in Xd.columns}
 
     bundles = {}
-    for ch, target, wins in [("n-type", "S_mu_n", False),
-                             ("p-type", "S_mu_p", True)]:
+    for ch, cfg in _CHANNEL_CFG.items():
         if ch not in ys:
             continue
+        target = cfg["target"]
         merged = Xd.merge(ys[ch], on="material_id",
                           suffixes=("", "_y")).dropna(subset=[target])
+        # p형 v3.2: 게이트 통과 물질만 + 외삽 제외
+        if cfg["use_gate"] and "gate_B_screen" in merged.columns:
+            merged = merged[merged["gate_B_screen"].fillna(False).astype(bool)]
+        if cfg["drop_extrap"] and "extrapolation_flag" in merged.columns:
+            merged = merged[~merged["extrapolation_flag"]
+                            .fillna(False).astype(bool)]
         if merged.empty:
             continue
-        _excl = _NON_FEATURE | _CROSS_EXCLUDE.get(target, set())
+        _excl = (_NON_FEATURE | _CROSS_EXCLUDE.get(target, set())
+                 | cfg["extra_exclude"])
         feat_cols = [c for c in merged.columns
                      if c not in _excl and not c.endswith("_y")
                      and pd.api.types.is_numeric_dtype(merged[c])]
-        v = merged[target].abs()                     # |μ| (노트북과 동일)
-        if wins:
-            v = _winsorize(v)                        # p형: |μ| 기준 winsorize
-        y = np.log1p(v)
-        X = merged[feat_cols].fillna(0)              # 노트북과 동일하게 0 대치
-        # 노트북과 동일: 80/20 분할 → train에 대한 5-fold CV + 20% test
+        v = merged[target].abs()                     # |타깃|
+        # n형: log(1+μ) / p형(v3.2): 이미 log10 스케일 → 변환 없음
+        y = np.log1p(v) if cfg["log_target"] else v.copy()
+        X = merged[feat_cols].fillna(0)
         Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2,
                                               random_state=42)
         m = HistGradientBoostingRegressor(random_state=42, max_iter=300)
@@ -585,6 +610,7 @@ def get_mobility_models():
             "model": m,
             "meta": {
                 "feat_cols": feat_cols,
+                "log_target": cfg["log_target"],
                 "medians": {c: (None if pd.isna(merged[c].median())
                                 else float(merged[c].median()))
                             for c in feat_cols},
@@ -610,7 +636,8 @@ def get_mobility_importance(channel, top=8):
     b = bundles.get(channel)
     if b is None:
         return pd.DataFrame(columns=["feature", "importance"])
-    target = "S_mu_n" if channel == "n-type" else "S_mu_p"
+    cfg = _CHANNEL_CFG[channel]
+    target = cfg["target"]
     fc = b["meta"]["feat_cols"]
     Xd, ys = _load_mobility_training()
     if Xd is not None and ys and channel in ys:
@@ -618,11 +645,13 @@ def get_mobility_importance(channel, top=8):
                      suffixes=("", "_y")).dropna(subset=[target])
     else:
         d = _add_derived_cols(df).dropna(subset=[target])
+    # 학습과 동일한 게이트/외삽 필터
+    if cfg["use_gate"] and "gate_B_screen" in d.columns:
+        d = d[d["gate_B_screen"].fillna(False).astype(bool)]
+    if cfg["drop_extrap"] and "extrapolation_flag" in d.columns:
+        d = d[~d["extrapolation_flag"].fillna(False).astype(bool)]
     _v = d[target].abs()
-    if channel == "p-type":
-        _q1, _q3 = _v.quantile(0.25), _v.quantile(0.75)
-        _v = _v.clip(_q1 - 1.5 * (_q3 - _q1), _q3 + 1.5 * (_q3 - _q1))
-    y = np.log1p(_v)
+    y = np.log1p(_v) if cfg["log_target"] else _v
     _Xfc = d.reindex(columns=fc).fillna(0)
     _, X_te, _, y_te = train_test_split(_Xfc, y, test_size=0.2,
                                         random_state=42)
@@ -647,7 +676,9 @@ def predict_mobility_row(base_vals):
         _feat = b["meta"]["feat_cols"]
         _X = pd.DataFrame([[full.get(c, np.nan) for c in _feat]],
                           columns=_feat)
-        mu = float(np.expm1(b["model"].predict(_X)[0]))
+        _raw = float(b["model"].predict(_X)[0])
+        # n형: log(1+μ) 학습 → expm1 / p형(v3.2): 원값 그대로
+        mu = float(np.expm1(_raw)) if b["meta"].get("log_target", True) else _raw
         g = np.asarray(b["meta"]["pct_grid"])
         return max(mu, 0.0), int(np.clip(np.searchsorted(g, mu), 0, 100))
     mn, pn = _pr(bn)
@@ -2371,12 +2402,14 @@ with tab6:
             if st.button("Mobility 예측 실행", icon=":material/play_circle:",
                          type="primary", width='stretch'):
                 def _predict(bundle):
-                    # 각 모델은 CROSS_EXCLUDE로 feature 집합이 다르므로
-                    # 자기 feature 순서대로 입력 행을 만든다. 없는 값은 NaN.
+                    # 각 모델은 feature 집합이 다르므로 자기 feature 순서로.
+                    # 없는 값은 NaN. n형은 expm1, p형(v3.2)은 원값 그대로.
                     _fc = bundle["meta"]["feat_cols"]
                     _Xrow = pd.DataFrame(
                         [[full.get(c, np.nan) for c in _fc]], columns=_fc)
-                    mu = float(np.expm1(bundle["model"].predict(_Xrow)[0]))
+                    _raw = float(bundle["model"].predict(_Xrow)[0])
+                    mu = (float(np.expm1(_raw))
+                          if bundle["meta"].get("log_target", True) else _raw)
                     grid = np.asarray(bundle["meta"]["pct_grid"])
                     pctile = int(np.clip(np.searchsorted(grid, mu), 0, 100))
                     return max(mu, 0.0), pctile
